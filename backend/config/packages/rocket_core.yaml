@@ -1,0 +1,4 @@
+rocket_core:
+    app_name: Rocket PMS
+    app_id: pms
+    token_prefix: rpm_

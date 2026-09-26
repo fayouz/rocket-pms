@@ -1,0 +1,5 @@
+booking:
+  unknown: 'Réservation inconnue pour ce logement.'
+code:
+  started: 'Séjour commencé ou passé : le code n’est plus envoyé à la serrure.'
+  already_created: 'Code déjà créé sur Nuki.'

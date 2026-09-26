@@ -1,0 +1,5 @@
+booking:
+  unknown: 'Unknown booking for this property.'
+code:
+  started: 'Stay already started or over: the code is no longer sent to the lock.'
+  already_created: 'Code already created on Nuki.'

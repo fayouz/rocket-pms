@@ -1,0 +1,20 @@
+{
+  "name": "Rocket PMS (démo)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "forwardPorts": [3700, 3701],
+  "portsAttributes": {
+    "3700": { "label": "Rocket PMS", "onAutoForward": "notify" },
+    "3701": { "label": "Documentation et changelog", "onAutoForward": "notify" },
+    "8700": { "label": "API", "onAutoForward": "silent" },
+    "5432": { "onAutoForward": "ignore" }
+  },
+  "postStartCommand": "bash demo/codespaces/start.sh"
+}

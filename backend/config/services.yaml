@@ -1,0 +1,21 @@
+parameters:
+    env(UPDATE_REPOSITORY): 'fayouz/rocket-pms'
+    env(LODGIFY_API_KEY): ''
+    env(NUKI_API_TOKEN): ''
+    env(PMS_TIMEZONE): 'Europe/Paris'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            $lodgifyApiKey: '%env(LODGIFY_API_KEY)%'
+            $nukiApiToken: '%env(NUKI_API_TOKEN)%'
+            $timezone: '%env(PMS_TIMEZONE)%'
+
+    App\:
+        resource: '../src/'
+
+when@test:
+    services:
+        App\Tests\Support\HttpMock: ~
