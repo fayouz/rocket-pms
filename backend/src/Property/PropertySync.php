@@ -2,6 +2,7 @@
 
 namespace App\Property;
 
+use App\Entity\Connector;
 use App\Entity\Property;
 use App\Entity\SmartLock;
 use App\Lodgify\LodgifyClient;
@@ -34,6 +35,8 @@ final class PropertySync
             if (null === $property) {
                 $property = (new Property())->setName($p['internalName'] ?? $p['name'])->setLodgifyPropertyId($p['id']);
                 $this->em->persist($property);
+                // Demo Homey connector (no address/key configured yet: read-only demo devices, see App\Homey\HomeyClient)
+                $this->em->persist((new Connector($property, 'homey'))->setName('Homey (démo)'));
                 ++$created;
             }
             $property->setLodgifyName($p['name'])->setCoordinates($p['latitude'], $p['longitude']);

@@ -5,8 +5,9 @@ Gestion de locations courte durée (logements, réservations Lodgify, serrures N
 ## Repères
 - `app_id` `pms`, jetons d'application `rpm_…`, ports front 3700 · api 8700 · docs 3701.
 - Domaine : `Property` (logement, lié à un logement Lodgify), `SmartLock` (serrure Nuki → logement), `AccessCode` (code clavier d'une réservation : prévu, créé, erreur). Les réservations, messages et devis ne sont **jamais stockés** : lus chez Lodgify (`Lodgify/LodgifyClient`, cache 5 min).
-- Intégrations : `Lodgify/LodgifyClient` (+ `DemoLodgify`), `Nuki/NukiClient` (+ `DemoNuki`) ; sans clé ou jeton : démo. Codes : `Code/AccessCodePlanner` (1 h avant l'arrivée / après le départ, fuseau `PMS_TIMEZONE`, jamais sur un séjour commencé, envoi à Nuki seulement sur action utilisateur). Timeline : `Timeline/TimelineBuilder`. Tableau de bord : `Dashboard/PropertiesSection`. Sondes : `Health/LodgifyProbe`, `Health/NukiProbe`.
-- Front : `pages/properties/[id].vue` (onglets), `components/BookingsInbox.vue`, `LocksInbox.vue`, `EventTimeline.vue` ; aides dans `utils/pms.ts`.
+- Intégrations : `Lodgify/LodgifyClient` (+ `DemoLodgify`), `Nuki/NukiClient` (+ `DemoNuki`) ; sans clé ou jeton : démo. Codes : `Code/AccessCodePlanner` (1 h avant l'arrivée / après le départ, fuseau `PMS_TIMEZONE`, jamais sur un séjour commencé, envoi à Nuki seulement sur action utilisateur). Timeline : `Timeline/TimelineBuilder`. Tableau de bord : `Dashboard/PropertiesSection`. Sondes : `Health/LodgifyProbe`, `Health/NukiProbe`, `Health/HomeyProbe`.
+- Domotique : `Domotique/PluginRegistry` (catalogue code-défini : `HomeyPlugin`, `WebServicePlugin`), entité `Connector` (plugin configuré pour un logement, plusieurs par logement), `Homey/HomeyClient` (+ `DemoHomey`, lecture seule). Secrets = uniquement un nom de variable `.env` préfixée `CONNECTOR_` (`Domotique/SecretEnv`), jamais la valeur en base. `Controller/ConnectorController` (CRUD admin + test), `Controller/DomotiqueController` (lecture par logement).
+- Front : `pages/properties/[id].vue` (onglets, dont « Domotique »), `components/BookingsInbox.vue`, `LocksInbox.vue`, `DomotiqueTab.vue`, `EventTimeline.vue` ; `pages/plugins.vue` (administration, catalogue) ; aides dans `utils/pms.ts`.
 
 ## Vérifier avant de pousser
 ```bash
