@@ -59,6 +59,48 @@ export interface Message {
 
 export interface LockLog { date: string, who: string, action: number, trigger: number }
 
+export interface PluginField {
+  key: string
+  label: string
+  type: string
+  required?: boolean
+  secret?: boolean
+  help?: string
+  placeholder?: string
+  options?: { label: string, value: string }[]
+}
+
+export interface Plugin {
+  id: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  fields: PluginField[]
+}
+
+export interface Connector {
+  id: string
+  propertyId: string
+  pluginId: string
+  name: string
+  enabled: boolean
+  config: Record<string, string>
+  secrets: Record<string, boolean>
+  lastRunAt: string | null
+  lastResult: string | null
+}
+
+export interface DomotiqueSection {
+  connectorId: string
+  name: string
+  pluginId: string
+  pluginName: string
+  icon: string
+  cards: { title: string, icon?: string, items: { label: string, value: string }[] }[]
+  error: string | null
+}
+
 export interface Lock {
   id: number
   name: string

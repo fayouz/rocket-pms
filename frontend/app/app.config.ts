@@ -24,6 +24,7 @@ export default defineAppConfig({
     // Extra entries of the Administration menu.
     adminNavigation: [
       { label: 'Serrures Nuki', icon: 'i-lucide-lock', to: '/locks' },
+      { label: 'Plugins', icon: 'i-lucide-puzzle', to: '/plugins' },
     ] as { label: string, icon: string, to: string, exactQuery?: boolean }[],
     // "Services & raccourcis" of the dashboard, besides the documentation, changelog and API.
     shortcuts: [] as { label: string, description: string, icon: string, to: string, admin?: boolean }[],

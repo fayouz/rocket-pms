@@ -11,6 +11,7 @@ useHead({ title: () => `${property.value?.name ?? 'Logement'} · ${useAppConfig(
 const tabs = [
   { label: 'Réservations', value: 'bookings', icon: 'i-lucide-calendar-days' },
   { label: 'Serrures', value: 'locks', icon: 'i-lucide-lock' },
+  { label: 'Domotique', value: 'domotique', icon: 'i-lucide-house-wifi' },
   { label: 'Timeline', value: 'timeline', icon: 'i-lucide-git-commit-vertical' },
 ]
 const tab = computed({
@@ -41,6 +42,7 @@ const { data: timeline } = await useAsyncData(`property-timeline-${id.value}`, (
     <template #body>
       <BookingsInbox v-if="tab === 'bookings'" :property-id="id" />
       <LocksInbox v-else-if="tab === 'locks'" :property-id="id" />
+      <DomotiqueTab v-else-if="tab === 'domotique'" :property-id="id" />
       <UCard v-else>
         <p class="mb-4 text-sm text-muted">Les 3 derniers jours et les 45 prochains : séjours, codes clavier, passages à la serrure.</p>
         <EventTimeline v-if="timeline" :events="timeline.events" :now="timeline.now" />
