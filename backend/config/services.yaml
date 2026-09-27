@@ -3,6 +3,8 @@ parameters:
     env(LODGIFY_API_KEY): ''
     env(NUKI_API_TOKEN): ''
     env(PMS_TIMEZONE): 'Europe/Paris'
+    env(ROCKET_CLOUD_URL): ''
+    env(ROCKET_CLOUD_TOKEN): ''
 
 services:
     _defaults:
@@ -12,6 +14,9 @@ services:
             $lodgifyApiKey: '%env(LODGIFY_API_KEY)%'
             $nukiApiToken: '%env(NUKI_API_TOKEN)%'
             $timezone: '%env(PMS_TIMEZONE)%'
+            $cloudUrl: '%env(ROCKET_CLOUD_URL)%'
+            $cloudToken: '%env(ROCKET_CLOUD_TOKEN)%'
+            $storagePath: '%kernel.project_dir%/var/demo-cloud.json'
 
     App\:
         resource: '../src/'
