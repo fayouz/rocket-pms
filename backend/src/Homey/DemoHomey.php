@@ -19,6 +19,10 @@ final class DemoHomey
             ['id' => 'd3', 'name' => 'Cave - capteur d’eau', 'class' => 'sensor', 'available' => false, 'capabilities' => [
                 ['id' => 'alarm_water', 'title' => 'Alarme eau', 'value' => false, 'units' => null],
             ]],
+            ['id' => 'd4', 'name' => 'Entrée - serrure', 'class' => 'lock', 'available' => true, 'capabilities' => [
+                ['id' => 'locked', 'title' => 'Verrouillée', 'value' => true, 'units' => null],
+                ['id' => 'measure_battery', 'title' => 'Batterie', 'value' => 76, 'units' => '%'],
+            ]],
         ];
     }
 }

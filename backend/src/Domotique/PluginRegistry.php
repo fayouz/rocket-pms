@@ -10,9 +10,9 @@ final class PluginRegistry
     /** @var list<PluginInterface> */
     private array $plugins;
 
-    public function __construct(HomeyPlugin $homey, WebServicePlugin $webService)
+    public function __construct(HomeyPlugin $homey, HomeAssistantPlugin $homeAssistant, NukiPlugin $nuki, WebServicePlugin $webService)
     {
-        $this->plugins = [$homey, $webService];
+        $this->plugins = [$homey, $homeAssistant, $nuki, $webService];
     }
 
     /** @return list<PluginInterface> */

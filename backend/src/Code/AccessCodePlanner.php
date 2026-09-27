@@ -4,9 +4,9 @@ namespace App\Code;
 
 use App\Entity\AccessCode;
 use App\Entity\SmartLock;
+use App\Lock\LockProviderRegistry;
 use App\Lodgify\Booking;
 use App\Lodgify\LodgifyClient;
-use App\Nuki\NukiClient;
 use App\Repository\AccessCodeRepository;
 use App\Repository\SmartLockRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,7 +27,7 @@ final class AccessCodePlanner
 
     public function __construct(
         private readonly LodgifyClient $lodgify,
-        private readonly NukiClient $nuki,
+        private readonly LockProviderRegistry $lockProviders,
         private readonly SmartLockRepository $locks,
         private readonly AccessCodeRepository $codes,
         private readonly EntityManagerInterface $em,
@@ -95,7 +95,7 @@ final class AccessCodePlanner
             throw new HttpException(409, $this->translator->trans('code.started'));
         }
         try {
-            $this->nuki->createKeypadCode($code->getLock()->getNukiId(), 'LH-'.$bookingId.' '.$b->guest, $code->getCode(), $code->getValidFrom(), $code->getValidUntil());
+            $this->lockProviders->codeProviderFor($code->getLock())->createCode($code->getLock(), $code->getCode(), 'LH-'.$bookingId.' '.$b->guest, $code->getValidFrom(), $code->getValidUntil());
         } catch (HttpException $e) {
             $code->markError($e->getMessage());
             $this->em->flush();

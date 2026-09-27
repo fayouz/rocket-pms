@@ -28,7 +28,7 @@ final class DomotiqueTest extends WebTestCase
         $this->api('GET', '/api/plugins');
         $this->assertStatus(401);
         $plugins = $this->api('GET', '/api/plugins', null, $this->user);
-        self::assertSame(['homey', 'webservice'], array_column($plugins, 'id'));
+        self::assertSame(['homey', 'home_assistant', 'nuki', 'webservice'], array_column($plugins, 'id'));
     }
 
     public function testDemoSeederCreatesAHomeyConnector(): void
