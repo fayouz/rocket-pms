@@ -2,7 +2,8 @@
 
 namespace App\Controller;
 
-use App\Cloud\CloudClient;
+use App\Cloud\DocumentProviderInterface;
+use App\Cloud\DocumentProviderRegistry;
 use App\Entity\Property;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -25,7 +26,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DocumentController extends AbstractController
 {
     public function __construct(
-        private readonly CloudClient $cloud,
+        private readonly DocumentProviderRegistry $documentProviders,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -33,15 +34,16 @@ final class DocumentController extends AbstractController
     #[Route('/api/properties/{id}/documents', name: 'api_property_documents', methods: ['GET'], requirements: ['id' => Requirement::UUID])]
     public function list(#[MapEntity] Property $property, Request $request): JsonResponse
     {
-        $rootId = $this->folderOf($property);
+        $cloud = $this->documentProviders->providerFor($property);
+        $rootId = $this->folderOf($cloud, $property);
         // Optional "folder=folder:<id>" to browse into a subfolder created under the property's own folder.
         $requested = (string) $request->query->get('folder', '');
         $folderId = '' !== $requested ? $this->splitItemId($requested)[1] : $rootId;
         if ('' !== $requested) {
-            $this->assertInTree($rootId, 'folder', $folderId);
+            $this->assertInTree($cloud, $rootId, 'folder', $folderId);
         }
 
-        return $this->json(['folderId' => $folderId, 'rootFolderId' => $rootId, 'items' => array_map($this->view(...), $this->cloud->list($folderId))]);
+        return $this->json(['folderId' => $folderId, 'rootFolderId' => $rootId, 'items' => array_map($this->view(...), $cloud->list($folderId))]);
     }
 
     #[Route('/api/properties/{id}/documents/folders', name: 'api_property_documents_create_folder', methods: ['POST'], requirements: ['id' => Requirement::UUID])]
@@ -53,14 +55,15 @@ final class DocumentController extends AbstractController
         if ('' === $name) {
             throw new HttpException(400, 'Le nom du dossier est requis.');
         }
-        $rootId = $this->folderOf($property);
+        $cloud = $this->documentProviders->providerFor($property);
+        $rootId = $this->folderOf($cloud, $property);
         $parent = $rootId;
         if ('' !== (string) ($body['folder'] ?? '')) {
             $parent = $this->splitItemId((string) $body['folder'])[1];
-            $this->assertInTree($rootId, 'folder', $parent);
+            $this->assertInTree($cloud, $rootId, 'folder', $parent);
         }
 
-        return $this->json($this->view($this->cloud->createFolder($parent, $name)), 201);
+        return $this->json($this->view($cloud->createFolder($parent, $name)), 201);
     }
 
     #[Route('/api/properties/{id}/documents/upload', name: 'api_property_documents_upload', methods: ['POST'], requirements: ['id' => Requirement::UUID])]
@@ -71,15 +74,16 @@ final class DocumentController extends AbstractController
         if (null === $file) {
             throw new HttpException(400, 'Aucun fichier envoyé.');
         }
-        $rootId = $this->folderOf($property);
+        $cloud = $this->documentProviders->providerFor($property);
+        $rootId = $this->folderOf($cloud, $property);
         $folderParam = (string) $request->request->get('folder', '');
         $folderId = $rootId;
         if ('' !== $folderParam) {
             $folderId = $this->splitItemId($folderParam)[1];
-            $this->assertInTree($rootId, 'folder', $folderId);
+            $this->assertInTree($cloud, $rootId, 'folder', $folderId);
         }
 
-        return $this->json($this->view($this->cloud->upload($folderId, $file)), 201);
+        return $this->json($this->view($cloud->upload($folderId, $file)), 201);
     }
 
     #[Route('/api/properties/{id}/documents/{itemId}', name: 'api_property_documents_update', methods: ['PATCH'], requirements: ['id' => Requirement::UUID])]
@@ -87,11 +91,12 @@ final class DocumentController extends AbstractController
     public function update(#[MapEntity] Property $property, string $itemId, Request $request): JsonResponse
     {
         [$kind, $id] = $this->splitItemId($itemId);
-        $rootId = $this->folderOf($property);
-        $this->assertInTree($rootId, $kind, $id);
+        $cloud = $this->documentProviders->providerFor($property);
+        $rootId = $this->folderOf($cloud, $property);
+        $this->assertInTree($cloud, $rootId, $kind, $id);
         $body = $request->toArray();
         if (\array_key_exists('name', $body)) {
-            $this->cloud->rename($id, $kind, trim((string) $body['name']));
+            $cloud->rename($id, $kind, trim((string) $body['name']));
         }
         if (\array_key_exists('folder', $body)) {
             if ('folder' === $kind && $id === $rootId) {
@@ -100,9 +105,9 @@ final class DocumentController extends AbstractController
             $target = $rootId;
             if (null !== $body['folder']) {
                 $target = $this->splitItemId((string) $body['folder'])[1];
-                $this->assertInTree($rootId, 'folder', $target);
+                $this->assertInTree($cloud, $rootId, 'folder', $target);
             }
-            $this->cloud->move($id, $kind, $target);
+            $cloud->move($id, $kind, $target);
         }
 
         return $this->json(['ok' => true]);
@@ -113,8 +118,9 @@ final class DocumentController extends AbstractController
     public function delete(#[MapEntity] Property $property, string $itemId, Request $request): JsonResponse
     {
         [$kind, $id] = $this->splitItemId($itemId);
-        $rootId = $this->folderOf($property);
-        $this->assertInTree($rootId, $kind, $id);
+        $cloud = $this->documentProviders->providerFor($property);
+        $rootId = $this->folderOf($cloud, $property);
+        $this->assertInTree($cloud, $rootId, $kind, $id);
         if ('folder' === $kind && $id === $rootId) {
             throw new HttpException(400, 'Le dossier racine du logement ne peut pas être supprimé.');
         }
@@ -122,9 +128,9 @@ final class DocumentController extends AbstractController
         $folderId = $rootId;
         if ('' !== $folderParam) {
             $folderId = $this->splitItemId($folderParam)[1];
-            $this->assertInTree($rootId, 'folder', $folderId);
+            $this->assertInTree($cloud, $rootId, 'folder', $folderId);
         }
-        $this->cloud->remove($folderId, $id, $kind);
+        $cloud->remove($folderId, $id, $kind);
 
         return $this->json(['ok' => true]);
     }
@@ -136,15 +142,16 @@ final class DocumentController extends AbstractController
         if ('file' !== $kind) {
             throw new HttpException(400, 'Seuls les fichiers ont un contenu.');
         }
+        $cloud = $this->documentProviders->providerFor($property);
         // $property kept in the route for the security check (ROLE_USER) and future audit; the id is enough for Rocket Cloud.
-        $this->assertInTree($this->folderOf($property), 'file', $id);
+        $this->assertInTree($cloud, $this->folderOf($cloud, $property), 'file', $id);
 
-        return new Response($this->cloud->content($id), 200, ['Content-Type' => 'application/octet-stream']);
+        return new Response($cloud->content($id), 200, ['Content-Type' => 'application/octet-stream']);
     }
 
-    private function folderOf(Property $property): string
+    private function folderOf(DocumentProviderInterface $cloud, Property $property): string
     {
-        $folderId = $this->cloud->ensureFolder($property->getId()->toRfc4122(), $property->getCloudFolderId() ?? '', $property->getName());
+        $folderId = $cloud->ensureFolder($property->getId()->toRfc4122(), $property->getCloudFolderId() ?? '', $property->getName());
         if ($folderId !== $property->getCloudFolderId()) {
             $property->setCloudFolderId($folderId);
             $this->em->flush();
@@ -159,9 +166,9 @@ final class DocumentController extends AbstractController
      * else in Rocket Cloud) just by guessing/reusing an id. Not found rather than forbidden, so as not to reveal
      * whether the id exists at all.
      */
-    private function assertInTree(string $rootFolderId, string $kind, string $id): void
+    private function assertInTree(DocumentProviderInterface $cloud, string $rootFolderId, string $kind, string $id): void
     {
-        if (!$this->cloud->belongsToProperty($id, $kind, $rootFolderId)) {
+        if (!$cloud->belongsToProperty($id, $kind, $rootFolderId)) {
             throw new HttpException(404, 'Document introuvable.');
         }
     }

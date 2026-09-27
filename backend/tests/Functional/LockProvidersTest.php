@@ -28,7 +28,7 @@ final class LockProvidersTest extends WebTestCase
     public function testCatalogueListsHomeAssistantAndNuki(): void
     {
         $plugins = $this->api('GET', '/api/plugins', null, $this->user);
-        self::assertSame(['homey', 'home_assistant', 'nuki', 'webservice'], array_column($plugins, 'id'));
+        self::assertSame(['homey', 'home_assistant', 'nuki', 'lodgify', 'rocketcloud', 'webservice'], array_column($plugins, 'id'));
         self::assertSame(['locks.state', 'locks.codes'], $this->capabilitiesOf('home_assistant'));
         self::assertSame(['locks.state', 'locks.codes'], $this->capabilitiesOf('nuki'));
         self::assertSame(['locks.state'], $this->capabilitiesOf('homey'));

@@ -123,6 +123,9 @@ async function test(c: Connector) {
           <div>
             <b class="text-sm">{{ c.name }}</b>
             <p class="text-xs text-muted">{{ pluginOf(c.pluginId)?.name ?? c.pluginId }} · {{ c.lastResult ?? 'jamais testé' }}</p>
+            <div v-if="pluginOf(c.pluginId)?.capabilities.length" class="mt-1 flex flex-wrap gap-1">
+              <UBadge v-for="cap in pluginOf(c.pluginId)!.capabilities" :key="cap" color="neutral" variant="subtle" size="sm">{{ cap }}</UBadge>
+            </div>
           </div>
           <div class="flex items-center gap-1.5">
             <UBadge :color="c.enabled ? 'success' : 'neutral'" variant="subtle" :label="c.enabled ? 'Actif' : 'Inactif'" />
@@ -142,6 +145,9 @@ async function test(c: Connector) {
           <UFormField v-if="!editing" label="Plugin">
             <USelect v-model="form.pluginId" :items="pluginOptions" class="w-full" />
           </UFormField>
+          <div v-if="pluginOf(form.pluginId)?.capabilities.length" class="flex flex-wrap gap-1">
+            <UBadge v-for="cap in pluginOf(form.pluginId)!.capabilities" :key="cap" color="neutral" variant="subtle" size="sm">{{ cap }}</UBadge>
+          </div>
           <UFormField label="Nom">
             <UInput v-model="form.name" class="w-full" />
           </UFormField>

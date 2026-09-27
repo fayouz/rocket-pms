@@ -118,6 +118,30 @@ final class DocumentTest extends WebTestCase
         $this->assertStatus(400);
     }
 
+    /**
+     * A "rocketcloud" connector on the property is picked over the legacy ROCKET_CLOUD_URL/TOKEN fallback
+     * (App\Cloud\DocumentProviderRegistry): the connector's secret variable is not set in .env, so listing documents
+     * fails instead of silently falling back to DemoCloud — proof that the connector was resolved.
+     */
+    public function testAPropertyConnectorIsPreferredOverTheLegacyRocketCloudAccount(): void
+    {
+        $port = $this->seed();
+        $this->api('GET', "/api/properties/$port/documents", null, $this->user);
+        $this->assertStatus(200, 'no connector yet: legacy/demo client answers');
+
+        $connector = $this->api('POST', "/api/properties/$port/connectors", [
+            'pluginId' => 'rocketcloud', 'config' => ['url' => 'https://cloud.example.org', 'secretVar' => 'CONNECTOR_ROCKET_CLOUD_TEST'],
+        ], $this->admin);
+        $this->assertStatus(201);
+
+        $this->api('GET', "/api/properties/$port/documents", null, $this->user);
+        $this->assertStatus(400, 'the property own connector is used, and its secret is not configured');
+
+        $this->api('PATCH', "/api/connectors/{$connector['id']}", ['enabled' => false], $this->admin);
+        $this->api('GET', "/api/properties/$port/documents", null, $this->user);
+        $this->assertStatus(200, 'disabling the connector restores the legacy/demo fallback');
+    }
+
     /** Demo property with its seeded documents folder; returns the id of "Le port". */
     private function seed(): string
     {

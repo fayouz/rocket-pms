@@ -5,7 +5,8 @@ namespace App\Controller;
 use App\Code\AccessCodePlanner;
 use App\Entity\Property;
 use App\Lodgify\Booking;
-use App\Lodgify\LodgifyClient;
+use App\Lodgify\BookingProviderInterface;
+use App\Lodgify\BookingProviderRegistry;
 use App\Property\PropertySync;
 use App\Repository\AccessCodeRepository;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -26,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
 final class PropertyController extends AbstractController
 {
     public function __construct(
-        private readonly LodgifyClient $lodgify,
+        private readonly BookingProviderRegistry $bookingProviders,
         private readonly AccessCodePlanner $planner,
         private readonly AccessCodeRepository $codes,
     ) {
@@ -43,14 +44,15 @@ final class PropertyController extends AbstractController
     #[Route('/api/properties/{id}/bookings', name: 'api_property_bookings', methods: ['GET'], requirements: ['id' => Requirement::UUID])]
     public function bookings(#[MapEntity] Property $property): JsonResponse
     {
+        $lodgify = $this->bookingProviders->providerFor($property);
         $this->planner->plan();
         $today = $this->planner->today();
         $since = (new \DateTimeImmutable($today))->modify('-60 days')->format('Y-m-d');
-        $list = array_filter($this->lodgify->bookings(), static fn (Booking $b) => $b->propertyId === $property->getLodgifyPropertyId() && $b->departure >= $since);
+        $list = array_filter($lodgify->bookings(), static fn (Booking $b) => $b->propertyId === $property->getLodgifyPropertyId() && $b->departure >= $since);
         usort($list, static fn (Booking $a, Booking $b) => strcmp($b->arrival, $a->arrival));
 
         return $this->json([
-            'demo' => $this->lodgify->isDemo(),
+            'demo' => $lodgify->isDemo(),
             'items' => array_map(function (Booking $b) use ($today) {
                 $code = $this->codes->find($b->id);
 
@@ -63,8 +65,9 @@ final class PropertyController extends AbstractController
     #[Route('/api/properties/{id}/bookings/{bookingId}/pricing', name: 'api_booking_pricing', methods: ['GET'], requirements: ['id' => Requirement::UUID, 'bookingId' => '\d+'])]
     public function pricing(#[MapEntity] Property $property, int $bookingId): JsonResponse
     {
-        $b = $this->bookingOf($property, $bookingId);
-        $r = $this->lodgify->bookingDetail($bookingId);
+        $lodgify = $this->bookingProviders->providerFor($property);
+        $b = $this->bookingOf($lodgify, $property, $bookingId);
+        $r = $lodgify->bookingDetail($bookingId);
         $q = $r['quote'] ?? [];
         $prices = [];
         foreach (['room_type_items', 'addon_items', 'other_items'] as $key) {
@@ -93,9 +96,10 @@ final class PropertyController extends AbstractController
     #[Route('/api/properties/{id}/bookings/{bookingId}/conversation', name: 'api_booking_conversation', methods: ['GET'], requirements: ['id' => Requirement::UUID, 'bookingId' => '\d+'])]
     public function conversation(#[MapEntity] Property $property, int $bookingId): JsonResponse
     {
-        $b = $this->bookingOf($property, $bookingId);
+        $lodgify = $this->bookingProviders->providerFor($property);
+        $b = $this->bookingOf($lodgify, $property, $bookingId);
         $messages = [];
-        foreach (null === $b->threadUid ? [] : $this->lodgify->thread($b->threadUid) as $m) {
+        foreach (null === $b->threadUid ? [] : $lodgify->thread($b->threadUid) as $m) {
             $messages[] = [
                 'key' => 'l'.$m['id'], 'kind' => 'lodgify', 'from' => 'Owner' === ($m['type'] ?? '') ? 'host' : 'guest',
                 'at' => (new \DateTimeImmutable((string) $m['date_created'], new \DateTimeZone('UTC')))->format(\DATE_ATOM),
@@ -111,7 +115,8 @@ final class PropertyController extends AbstractController
     #[Route('/api/properties/{id}/bookings/{bookingId}/conversation', name: 'api_booking_reply', methods: ['POST'], requirements: ['id' => Requirement::UUID, 'bookingId' => '\d+'])]
     public function reply(#[MapEntity] Property $property, int $bookingId, Request $request): JsonResponse
     {
-        $this->bookingOf($property, $bookingId);
+        $lodgify = $this->bookingProviders->providerFor($property);
+        $this->bookingOf($lodgify, $property, $bookingId);
         $body = $request->toArray();
         $text = trim((string) ($body['text'] ?? ''));
         if ('' === $text || mb_strlen($text) > 5000) {
@@ -120,14 +125,14 @@ final class PropertyController extends AbstractController
         if (!Uuid::isValid((string) ($body['messageId'] ?? ''))) {
             throw new HttpException(422, 'Identifiant de message invalide.');
         }
-        $this->lodgify->sendMessage($bookingId, nl2br(htmlspecialchars($text, \ENT_QUOTES)), (string) $body['messageId']);
+        $lodgify->sendMessage($bookingId, nl2br(htmlspecialchars($text, \ENT_QUOTES)), (string) $body['messageId']);
 
         return $this->json(['ok' => true]);
     }
 
-    private function bookingOf(Property $property, int $bookingId): Booking
+    private function bookingOf(BookingProviderInterface $lodgify, Property $property, int $bookingId): Booking
     {
-        $b = $this->lodgify->booking($bookingId);
+        $b = $lodgify->booking($bookingId);
         if (null === $b || $b->propertyId !== $property->getLodgifyPropertyId()) {
             throw new HttpException(404, 'Réservation inconnue pour ce logement.');
         }

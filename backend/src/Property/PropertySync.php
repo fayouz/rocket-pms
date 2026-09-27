@@ -5,7 +5,7 @@ namespace App\Property;
 use App\Entity\Connector;
 use App\Entity\Property;
 use App\Entity\SmartLock;
-use App\Lodgify\LodgifyClient;
+use App\Lodgify\BookingProviderRegistry;
 use App\Nuki\NukiClient;
 use App\Repository\PropertyRepository;
 use App\Repository\SmartLockRepository;
@@ -14,11 +14,13 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Creates a property for every Lodgify property not linked yet (named after its short "internal name"), refreshes the
  * Lodgify name and coordinates, and registers every Nuki lock (the link lock → property is chosen by an admin).
+ * Runs before any property (and so any connector) exists: always uses the legacy, global LODGIFY_API_KEY account
+ * (App\Lodgify\BookingProviderRegistry::legacy), same as before this account became pluggable per property.
  */
 final class PropertySync
 {
     public function __construct(
-        private readonly LodgifyClient $lodgify,
+        private readonly BookingProviderRegistry $bookingProviders,
         private readonly NukiClient $nuki,
         private readonly PropertyRepository $properties,
         private readonly SmartLockRepository $locks,
@@ -30,7 +32,7 @@ final class PropertySync
     public function sync(): array
     {
         $created = 0;
-        foreach ($this->lodgify->properties() as $p) {
+        foreach ($this->bookingProviders->legacy()->properties() as $p) {
             $property = $this->properties->findOneBy(['lodgifyPropertyId' => $p['id']]);
             if (null === $property) {
                 $property = (new Property())->setName($p['internalName'] ?? $p['name'])->setLodgifyPropertyId($p['id']);

@@ -115,6 +115,28 @@ final class PropertyTest extends WebTestCase
         self::assertArrayHasKey('occupancy', $kpis);
     }
 
+    /**
+     * A "lodgify" connector on the property is picked over the legacy LODGIFY_API_KEY fallback
+     * (App\Lodgify\BookingProviderRegistry): here it points at a CONNECTOR_ variable that is not set in .env, so the
+     * bookings endpoint fails instead of silently falling back to the demo/global account — proof that the
+     * connector, not the legacy client, was resolved. No network call is made (App\Domotique\SecretEnv fails first).
+     */
+    public function testAPropertyConnectorIsPreferredOverTheLegacyLodgifyAccount(): void
+    {
+        $port = $this->seed();
+        self::assertTrue($this->api('GET', "/api/properties/$port/bookings", null, $this->user)['demo'], 'no connector yet: legacy/demo client answers');
+
+        $connector = $this->api('POST', "/api/properties/$port/connectors", ['pluginId' => 'lodgify', 'config' => ['secretVar' => 'CONNECTOR_LODGIFY_TEST']], $this->admin);
+        $this->assertStatus(201);
+
+        $this->api('GET', "/api/properties/$port/bookings", null, $this->user);
+        $this->assertStatus(400, 'the property own connector is used, and its secret is not configured');
+
+        // Disabling the connector restores the legacy/demo fallback.
+        $this->api('PATCH', "/api/connectors/{$connector['id']}", ['enabled' => false], $this->admin);
+        self::assertTrue($this->api('GET', "/api/properties/$port/bookings", null, $this->user)['demo']);
+    }
+
     /** Demo properties and locks, as the demo seeder does; returns the id of "Le port". */
     private function seed(): string
     {
