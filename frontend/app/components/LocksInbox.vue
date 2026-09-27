@@ -45,6 +45,7 @@ async function send(i: CodeItem) {
           <UBadge size="sm" :color="l.locked ? 'success' : 'warning'" variant="subtle" :label="l.state" />
         </div>
         <p class="text-xs text-muted">
+          <UBadge v-if="l.provider !== 'nuki'" size="sm" variant="subtle" color="neutral" :label="l.provider" class="mr-1" />
           Batterie {{ l.battery === null ? 'inconnue' : `${l.battery} %` }} · {{ codesOf(l.id).length }} code{{ codesOf(l.id).length > 1 ? 's' : '' }} à venir
           <span v-if="l.batteryCritical || l.keypadBatteryCritical" class="text-error"> · ⚠</span>
         </p>

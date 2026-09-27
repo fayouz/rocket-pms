@@ -3,9 +3,16 @@
 namespace App\Domotique;
 
 use App\Homey\HomeyClient;
+use App\Lock\HomeyProvider;
+use App\Lock\LockCapablePluginInterface;
+use App\Lock\LockProviderInterface;
 
-/** Homey Pro hub: devices of the property and their capability values. Read-only (v0.2). */
-final class HomeyPlugin implements PluginInterface
+/**
+ * Homey Pro hub: devices of the property and their capability values. Read-only (v0.2) for the "Domotique" tab, and
+ * a read-only source of smart locks ('locks.state'): Homey exposes lock/unlock and a "locked" state for its lock
+ * devices, but no generic keypad-code service, so 'locks.codes' is not declared (see App\Lock\HomeyProvider).
+ */
+final class HomeyPlugin implements PluginInterface, LockCapablePluginInterface
 {
     public function __construct(private readonly HomeyClient $homey)
     {
@@ -16,6 +23,12 @@ final class HomeyPlugin implements PluginInterface
     public function description(): string { return 'Hub domotique Homey (Pro) : appareils du logement et leurs valeurs (températures, prises, capteurs…). Lecture seule.'; }
     public function icon(): string { return 'i-lucide-house-wifi'; }
     public function category(): string { return 'domotique'; }
+    public function capabilities(): array { return ['locks.state']; }
+
+    public function lockProvider(array $config): LockProviderInterface
+    {
+        return new HomeyProvider($this->homey, $config);
+    }
 
     public function fields(): array
     {

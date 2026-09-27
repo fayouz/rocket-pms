@@ -23,6 +23,7 @@ final class WebServicePlugin implements PluginInterface
     public function description(): string { return 'Brancher n’importe quelle API web (REST/JSON) en lecture seule : affiche des informations dans l’onglet Domotique.'; }
     public function icon(): string { return 'i-lucide-globe'; }
     public function category(): string { return 'general'; }
+    public function capabilities(): array { return []; }
 
     public function fields(): array
     {

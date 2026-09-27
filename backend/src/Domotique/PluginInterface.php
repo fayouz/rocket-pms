@@ -30,4 +30,13 @@ interface PluginInterface
 
     /** Info cards for the "Domotique" tab. @param array<string, string> $config @return list<array{title: string, icon?: string, items: list<array{label: string, value: string}>}> */
     public function info(array $config): array;
+
+    /**
+     * Capabilities this plugin can provide beyond the read-only info cards, e.g. 'locks.state' (list/read smart
+     * locks) and 'locks.codes' (write a temporary keypad/access code). Empty for a plugin that is purely informative.
+     * A plugin declaring 'locks.state' or 'locks.codes' must implement App\Lock\LockCapablePluginInterface.
+     *
+     * @return list<string>
+     */
+    public function capabilities(): array;
 }

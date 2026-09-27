@@ -112,6 +112,8 @@ export interface Lock {
   logs: LockLog[]
   propertyId: string | null
   property: string | null
+  /** Controller providing the live state: 'nuki' (legacy, env token) unless rerouted to a connector (e.g. 'home_assistant', 'homey'). */
+  provider: string
 }
 
 export interface TimelineEvent { at: string, kind: string, icon: string, title: string, description: string }
