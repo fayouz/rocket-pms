@@ -14,7 +14,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * property's folder, so a PMS user never needs a Cloud account or token. Without ROCKET_CLOUD_URL/TOKEN: DemoCloud
  * (no network call at all, keeps functional tests offline as the other integrations do).
  */
-final class CloudClient
+final class CloudClient implements DocumentProviderInterface
 {
     private const TIMEOUT = 8;
     private const ROOT_FOLDER_NAME = 'Rocket PMS';

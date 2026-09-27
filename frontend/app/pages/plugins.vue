@@ -26,6 +26,9 @@ const { data: plugins } = await useAsyncData('plugins-catalogue', () => api<Plug
             <span class="flex items-center gap-2"><UIcon :name="p.icon" class="size-5" /> <b>{{ p.name }}</b></span>
           </template>
           <p class="text-sm text-muted">{{ p.description }}</p>
+          <div v-if="p.capabilities.length" class="mt-2 flex flex-wrap gap-1">
+            <UBadge v-for="c in p.capabilities" :key="c" color="neutral" variant="subtle" size="sm">{{ c }}</UBadge>
+          </div>
           <ul class="mt-2 space-y-0.5 text-xs text-muted">
             <li v-for="f in p.fields" :key="f.key">
               {{ f.label }} <span v-if="f.required">*</span><span v-if="f.secret"> (variable .env)</span>

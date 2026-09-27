@@ -4,7 +4,7 @@ namespace App\Timeline;
 
 use App\Code\AccessCodePlanner;
 use App\Entity\Property;
-use App\Lodgify\LodgifyClient;
+use App\Lodgify\BookingProviderRegistry;
 use App\Nuki\NukiClient;
 use App\Repository\AccessCodeRepository;
 use App\Repository\SmartLockRepository;
@@ -18,7 +18,7 @@ final class TimelineBuilder
     private const ACTIONS = [1 => 'Déverrouillage', 2 => 'Verrouillage', 3 => 'Ouverture (pêne)', 4 => 'Lock’n’Go', 5 => 'Lock’n’Go + ouverture'];
 
     public function __construct(
-        private readonly LodgifyClient $lodgify,
+        private readonly BookingProviderRegistry $bookingProviders,
         private readonly NukiClient $nuki,
         private readonly AccessCodeRepository $codes,
         private readonly SmartLockRepository $locks,
@@ -33,7 +33,7 @@ final class TimelineBuilder
         $to = new \DateTimeImmutable('+'.$future.' days');
         $in = static fn (\DateTimeImmutable $d) => $d >= $from && $d <= $to;
         $events = [];
-        foreach ($this->lodgify->bookings() as $b) {
+        foreach ($this->bookingProviders->providerFor($property)->bookings() as $b) {
             if ($b->propertyId !== $property->getLodgifyPropertyId() || !$b->isActive()) {
                 continue;
             }

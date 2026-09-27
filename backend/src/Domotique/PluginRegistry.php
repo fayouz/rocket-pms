@@ -10,9 +10,9 @@ final class PluginRegistry
     /** @var list<PluginInterface> */
     private array $plugins;
 
-    public function __construct(HomeyPlugin $homey, HomeAssistantPlugin $homeAssistant, NukiPlugin $nuki, WebServicePlugin $webService)
+    public function __construct(HomeyPlugin $homey, HomeAssistantPlugin $homeAssistant, NukiPlugin $nuki, LodgifyPlugin $lodgify, RocketCloudPlugin $rocketCloud, WebServicePlugin $webService)
     {
-        $this->plugins = [$homey, $homeAssistant, $nuki, $webService];
+        $this->plugins = [$homey, $homeAssistant, $nuki, $lodgify, $rocketCloud, $webService];
     }
 
     /** @return list<PluginInterface> */
@@ -31,9 +31,9 @@ final class PluginRegistry
         throw new HttpException(404, 'Plugin inconnu.');
     }
 
-    /** @return array{id: string, name: string, description: string, icon: string, category: string, fields: array<mixed>} */
+    /** @return array{id: string, name: string, description: string, icon: string, category: string, fields: array<mixed>, capabilities: list<string>} */
     public function view(PluginInterface $p): array
     {
-        return ['id' => $p->id(), 'name' => $p->name(), 'description' => $p->description(), 'icon' => $p->icon(), 'category' => $p->category(), 'fields' => $p->fields()];
+        return ['id' => $p->id(), 'name' => $p->name(), 'description' => $p->description(), 'icon' => $p->icon(), 'category' => $p->category(), 'fields' => $p->fields(), 'capabilities' => $p->capabilities()];
     }
 }

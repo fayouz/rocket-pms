@@ -77,6 +77,7 @@ export interface Plugin {
   icon: string
   category: string
   fields: PluginField[]
+  capabilities: string[]
 }
 
 export interface Connector {

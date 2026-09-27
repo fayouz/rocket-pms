@@ -11,7 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Lodgify public API (v1 and v2): properties, bookings (cached 5 minutes), booking detail with its quote, messaging
  * thread, sending a message to the guest. Without LODGIFY_API_KEY, the demo data of DemoLodgify is used.
  */
-final class LodgifyClient
+final class LodgifyClient implements BookingProviderInterface
 {
     private const BASE = 'https://api.lodgify.com';
 
@@ -19,6 +19,8 @@ final class LodgifyClient
         private readonly HttpClientInterface $http,
         private readonly CacheInterface $cache,
         private readonly string $lodgifyApiKey,
+        /** Distinguishes the cache entries of several Lodgify accounts (one per connector) from the legacy global one. */
+        private readonly string $cacheKeyPrefix = 'lodgify',
     ) {
     }
 
@@ -34,7 +36,7 @@ final class LodgifyClient
             return DemoLodgify::properties();
         }
 
-        return $this->cache->get('lodgify.properties', function (ItemInterface $item) {
+        return $this->cache->get($this->cacheKeyPrefix.'.properties', function (ItemInterface $item) {
             $item->expiresAfter(300);
             $r = $this->get('/v2/properties');
             $list = array_is_list($r) ? $r : ($r['items'] ?? []);
@@ -54,7 +56,7 @@ final class LodgifyClient
         if ($this->isDemo()) {
             return DemoLodgify::bookings();
         }
-        $raw = $this->cache->get('lodgify.bookings', function (ItemInterface $item) {
+        $raw = $this->cache->get($this->cacheKeyPrefix.'.bookings', function (ItemInterface $item) {
             $item->expiresAfter(300);
             $out = [];
             for ($page = 1; $page <= 20; ++$page) {
@@ -114,7 +116,7 @@ final class LodgifyClient
 
     public function invalidateBookings(): void
     {
-        $this->cache->delete('lodgify.bookings');
+        $this->cache->delete($this->cacheKeyPrefix.'.bookings');
     }
 
     /** @param array<string, mixed> $b */
