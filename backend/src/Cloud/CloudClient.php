@@ -124,6 +124,47 @@ final class CloudClient
         $this->request('PATCH', \sprintf('/api/%s/%s', 'file' === $kind ? 'files' : 'folders', $itemId), [$field => null === $targetFolderId ? null : "/api/folders/{$targetFolderId}"]);
     }
 
+    /**
+     * Whether a folder or file is inside the subtree rooted at $rootFolderId (a property's own folder), directly or
+     * through any number of parent folders. Used by the controller to reject any id belonging to another property
+     * (or outside Rocket PMS's own folders altogether) with a 404, since Cloud item ids are otherwise opaque to it.
+     * Any failure to resolve the item (not found, Cloud unreachable, ...) is treated as "does not belong" (fail closed).
+     */
+    public function belongsToProperty(string $itemId, string $kind, string $rootFolderId): bool
+    {
+        if ($this->isDemo()) {
+            return $this->demo->belongsToProperty($itemId, $kind, $rootFolderId);
+        }
+        try {
+            if ('file' === $kind) {
+                $file = $this->request('GET', "/api/files/{$itemId}");
+                $folderIri = (string) ($file['folder'] ?? '');
+                if ('' === $folderIri) {
+                    return false;
+                }
+                $folder = $this->request('GET', '/api/folders/'.$this->idFromIri($folderIri));
+            } else {
+                $folder = $this->request('GET', "/api/folders/{$itemId}");
+            }
+        } catch (\Throwable) {
+            return false;
+        }
+        foreach ((array) ($folder['path'] ?? []) as $node) {
+            if (\is_array($node) && ($node['id'] ?? null) === $rootFolderId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function idFromIri(string $iriOrId): string
+    {
+        $pos = strrpos($iriOrId, '/');
+
+        return false === $pos ? $iriOrId : substr($iriOrId, $pos + 1);
+    }
+
     /** Byte content of a file, streamed back by the PMS controller (the browser never sees the Cloud token). */
     public function content(string $fileId): string
     {

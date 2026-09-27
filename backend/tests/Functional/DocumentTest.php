@@ -61,6 +61,63 @@ final class DocumentTest extends WebTestCase
         self::assertCount(1, $documents['items']);
     }
 
+    public function testAFolderOfAnotherPropertyIs404(): void
+    {
+        [$portId, $vignesId] = $this->seedTwo();
+
+        // Create a folder under "Les vignes", then try to browse/write into it from "Le port".
+        $this->api('GET', "/api/properties/$vignesId/documents", null, $this->admin);
+        $foreignFolder = $this->api('POST', "/api/properties/$vignesId/documents/folders", ['name' => 'Contrats'], $this->admin);
+
+        $this->api('GET', "/api/properties/$portId/documents?folder={$foreignFolder['id']}", null, $this->user);
+        $this->assertStatus(404);
+
+        $this->api('POST', "/api/properties/$portId/documents/folders", ['name' => 'Sous-dossier', 'folder' => $foreignFolder['id']], $this->admin);
+        $this->assertStatus(404);
+
+        $this->api('PATCH', "/api/properties/$portId/documents/{$foreignFolder['id']}", ['name' => 'Renommé'], $this->admin);
+        $this->assertStatus(404);
+
+        $this->api('DELETE', "/api/properties/$portId/documents/{$foreignFolder['id']}", null, $this->admin);
+        $this->assertStatus(404);
+    }
+
+    public function testAFileOfAnotherPropertyIs404(): void
+    {
+        [$portId, $vignesId] = $this->seedTwo();
+
+        $vignesDocuments = $this->api('GET', "/api/properties/$vignesId/documents", null, $this->admin);
+        $foreignFile = $vignesDocuments['items'][0]['id']; // demo-seeded "Bienvenue.pdf"
+
+        $this->api('GET', "/api/properties/$portId/documents/$foreignFile/content", null, $this->user);
+        $this->assertStatus(404);
+
+        $this->api('PATCH', "/api/properties/$portId/documents/$foreignFile", ['name' => 'Renommé'], $this->admin);
+        $this->assertStatus(404);
+
+        $this->api('DELETE', "/api/properties/$portId/documents/$foreignFile", null, $this->admin);
+        $this->assertStatus(404);
+
+        // Cannot move a document of "Le port" into "Les vignes" folder either.
+        $portDocuments = $this->api('GET', "/api/properties/$portId/documents", null, $this->admin);
+        $ownFile = $portDocuments['items'][0]['id'];
+        $this->api('PATCH', "/api/properties/$portId/documents/$ownFile", ['folder' => $foreignFile], $this->admin);
+        $this->assertStatus(404);
+    }
+
+    public function testThePropertyRootFolderCannotBeMovedOrDeleted(): void
+    {
+        $port = $this->seed();
+        $documents = $this->api('GET', "/api/properties/$port/documents", null, $this->admin);
+        $rootFolder = 'folder:'.$documents['rootFolderId'];
+
+        $this->api('PATCH', "/api/properties/$port/documents/$rootFolder", ['folder' => null], $this->admin);
+        $this->assertStatus(400);
+
+        $this->api('DELETE', "/api/properties/$port/documents/$rootFolder", null, $this->admin);
+        $this->assertStatus(400);
+    }
+
     /** Demo property with its seeded documents folder; returns the id of "Le port". */
     private function seed(): string
     {
@@ -68,5 +125,14 @@ final class DocumentTest extends WebTestCase
         $properties = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name');
 
         return $properties['Le port'];
+    }
+
+    /** @return array{0: string, 1: string} ids of "Le port" and "Les vignes" */
+    private function seedTwo(): array
+    {
+        $this->api('POST', '/api/properties/sync', [], $this->admin);
+        $properties = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name');
+
+        return [$properties['Le port'], $properties['Les vignes']];
     }
 }

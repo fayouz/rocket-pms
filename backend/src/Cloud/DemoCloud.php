@@ -68,6 +68,41 @@ final class DemoCloud
         }
     }
 
+    /**
+     * Whether $itemId (a folder or a file) sits inside the subtree rooted at $rootFolderId, walking parents up.
+     * The state only tracks "folder -> its items", so a folder's own parent is the key under which it appears
+     * as an item; a property's root folder itself has no parent (it is created directly, never appended as an
+     * item), which is also what makes it its own root for this check.
+     */
+    public function belongsToProperty(string $itemId, string $kind, string $rootFolderId): bool
+    {
+        if ($itemId === $rootFolderId && 'folder' === $kind) {
+            return true;
+        }
+        $parent = $this->parentOf($itemId);
+        for ($depth = 0; null !== $parent && $depth < 50; ++$depth) {
+            if ($parent === $rootFolderId) {
+                return true;
+            }
+            $parent = $this->parentOf($parent);
+        }
+
+        return false;
+    }
+
+    private function parentOf(string $itemId): ?string
+    {
+        foreach ($this->load() as $folderId => $items) {
+            foreach ($items as $item) {
+                if ($item['id'] === $itemId) {
+                    return $folderId;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function move(string $itemId, ?string $targetFolderId): void
     {
         $state = $this->load();
