@@ -2,9 +2,12 @@
 
 namespace App\Command;
 
+use App\Entity\Expense;
+use App\Entity\Property;
 use App\Place\DemoPlace;
 use App\Place\PlaceClient;
 use App\Property\PropertySync;
+use App\Repository\ExpenseRepository;
 use App\Repository\PropertyRepository;
 use App\Repository\WelcomeBookRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,6 +28,7 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
         private readonly PlaceClient $place,
         private readonly EntityManagerInterface $em,
         private readonly WelcomeBookRepository $books,
+        private readonly ExpenseRepository $expenses,
     ) {
     }
 
@@ -50,6 +54,7 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
                     'localTips' => 'Boulangerie au coin de la rue, marché le samedi matin.',
                 ]);
             }
+            $this->seedExpenses($property);
             if ($this->place->isDemo()) {
                 $property->setPlaceId($demoPlaceId);
             } elseif (null === $property->getPlaceId() || \in_array($property->getPlaceId(), [DemoPlace::PORT, DemoPlace::VIGNES], true)) {
@@ -62,6 +67,25 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
         }
         $this->em->flush();
         $io->writeln($this->place->isDemo() ? 'Logements de démo : 2, liés à leur lieu Rocket Place de démo.' : 'Logements de démo : 2, liés à leur lieu Rocket Place (ROCKET_PLACE_URL).');
+    }
+
+    /** A few accounting entries of the current year for the bilan, once (never when the property already has some). */
+    private function seedExpenses(Property $property): void
+    {
+        if (null !== $this->expenses->findOneBy(['property' => $property])) {
+            return;
+        }
+        $y = (int) date('Y');
+        foreach ([
+            ["$y-01-15", 420, 'assurance', 'Assurance PNO annuelle'],
+            ["$y-02-03", 39.99, 'internet', 'Box internet'],
+            ["$y-03-12", 185, 'menage', 'Ménages de mars'],
+            ["$y-04-20", 96.4, 'energie', 'Électricité'],
+            ["$y-06-08", 250, 'entretien', 'Réparation chauffe-eau'],
+            ["$y-07-01", 60, 'autre_recette', 'Remboursement caution cassée'],
+        ] as [$date, $amount, $category, $note]) {
+            $this->em->persist((new Expense($property))->apply(['date' => $date, 'amount' => $amount, 'category' => $category, 'note' => $note]));
+        }
     }
 
     /** Id of the place named $name in the real Rocket Place, created when missing. */

@@ -2,7 +2,7 @@
 import type { Property, TimelineEvent } from '~/types/pms'
 
 // A property: bookings (inbox, conversation, value, lock), its place in Rocket Place (locks and keypad codes,
-// domotique, documents, stock, all proxied by PMS), timeline.
+// domotique, documents, stock, all proxied by PMS), welcome book, bilan, timeline.
 const route = useRoute()
 const api = useApi()
 const id = computed(() => String(route.params.id))
@@ -17,6 +17,7 @@ const tabs = [
   { label: 'Documents', value: 'documents', icon: 'i-lucide-folder' },
   { label: 'Stock', value: 'stock', icon: 'i-lucide-package' },
   { label: 'Livret & TV', value: 'livret', icon: 'i-lucide-book-open' },
+  { label: 'Bilan', value: 'bilan', icon: 'i-lucide-chart-column' },
   { label: 'Timeline', value: 'timeline', icon: 'i-lucide-git-commit-vertical' },
 ]
 const tab = computed({
@@ -52,6 +53,7 @@ const { data: timeline } = await useAsyncData(`property-timeline-${id.value}`, (
       <DocumentsTab v-else-if="tab === 'documents'" :property-id="id" :place-id="property?.placeId ?? null" />
       <StockTab v-else-if="tab === 'stock'" :key="`stock-${property?.placeId}`" :property-id="id" />
       <WelcomeBookTab v-else-if="tab === 'livret'" :property-id="id" />
+      <BilanTab v-else-if="tab === 'bilan'" :property-id="id" />
       <UCard v-else>
         <p class="mb-4 text-sm text-muted">Les 3 derniers jours et les 45 prochains : séjours, codes clavier, passages à la serrure.</p>
         <EventTimeline v-if="timeline" :events="timeline.events" :now="timeline.now" />
