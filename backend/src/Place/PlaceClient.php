@@ -123,6 +123,12 @@ final class PlaceClient
         return $this->request('PATCH', '/api/cleanings/'.$cleaningId, $changes);
     }
 
+    /** Secret link without account of a cleaning (Rocket Place GET /api/cleanings/{id}/link, created on first call). @return array{url?: string, path?: string, expiresAt?: string} */
+    public function cleaningLink(string $cleaningId): array
+    {
+        return $this->request('GET', '/api/cleanings/'.$cleaningId.'/link');
+    }
+
     /** @return array<mixed> */
     public function upload(string $path, UploadedFile $file, ?string $folder): array
     {

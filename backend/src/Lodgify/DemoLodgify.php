@@ -2,7 +2,11 @@
 
 namespace App\Lodgify;
 
-/** Fictitious Lodgify data (no LODGIFY_API_KEY): two properties, a few bookings around today, one conversation. */
+/**
+ * Fictitious Lodgify data (no LODGIFY_API_KEY): two properties, a few bookings around today, one conversation.
+ * Every active booking has a guest e-mail matching a conversation of App\Mailer\DemoMailer (e-mails tab in demo);
+ * the declined booking 6 has none.
+ */
 final class DemoLodgify
 {
     /** @return list<array{id: int, name: string, internalName: ?string, latitude: ?float, longitude: ?float}> */
@@ -22,11 +26,11 @@ final class DemoLodgify
         $d = static fn (int $n) => (new \DateTimeImmutable('today', $tz))->modify(($n >= 0 ? '+' : '').$n.' days')->format('Y-m-d');
 
         return [
-            new Booking(1, 1001, $d(-3), $d(0), 'Alex Martin', 'Booked', 'AirbnbIntegration', 210, 'demo-1', null, '15:00', '11:00'),
+            new Booking(1, 1001, $d(-3), $d(0), 'Alex Martin', 'Booked', 'AirbnbIntegration', 210, 'demo-1', 'alex.demo@guest.airbnb.com', '15:00', '11:00'),
             new Booking(2, 1002, $d(-1), $d(2), 'Marc Durand', 'Booked', 'BookingCom', 240, 'demo-2', 'marc.demo@guest.booking.com', '16:00', '10:00'),
-            new Booking(3, 1001, $d(0), $d(3), 'Sofia Rossi', 'Booked', 'AirbnbIntegration', 205, 'demo-3', null, '15:00', '11:00'),
+            new Booking(3, 1001, $d(0), $d(3), 'Sofia Rossi', 'Booked', 'AirbnbIntegration', 205, 'demo-3', 'sofia.demo@guest.airbnb.com', '15:00', '11:00'),
             new Booking(4, 1002, $d(4), $d(6), 'Paul Morel', 'Booked', 'Manual', 140, null, 'paul.demo@example.org', '15:00', '11:00'),
-            new Booking(5, 1001, $d(8), $d(12), 'Anna Kowalska', 'Booked', 'BookingCom', 420, 'demo-5', null, '15:00', '11:00'),
+            new Booking(5, 1001, $d(8), $d(12), 'Anna Kowalska', 'Booked', 'BookingCom', 420, 'demo-5', 'anna.demo@guest.booking.com', '15:00', '11:00'),
             new Booking(6, 1002, $d(-20), $d(-15), 'Tom Baker', 'Declined', 'BookingCom', 380, null, null, null, null),
         ];
     }

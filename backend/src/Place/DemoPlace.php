@@ -58,6 +58,7 @@ final class DemoPlace
             $route('GET', "/api/places/$uuid/cleanings") => array_values(array_filter($s['cleanings'] ?? [], fn (array $c) => $c['placeId'] === $this->place($s, $m[1])['id'])),
             $route('POST', "/api/places/$uuid/cleanings") => $this->createCleaning($s, $m[1], $json),
             $route('PATCH', "/api/cleanings/$uuid") => $this->patchCleaning($s, $m[1], $json),
+            $route('GET', "/api/cleanings/$uuid/link") => $this->cleaningLink($s, $m[1]),
             $route('GET', "/api/places/$uuid/domotique") => $this->domotique($s, $m[1]),
             $route('GET', "/api/places/$uuid/documents") => $this->documents($s, $m[1], (string) ($query['folder'] ?? '')),
             $route('POST', "/api/places/$uuid/documents/folders") => $this->addDocument($s, $m[1], 'folder', (string) ($json['name'] ?? ''), null, $json['folder'] ?? null),
@@ -220,6 +221,15 @@ final class DemoPlace
         ];
 
         return $s['cleanings'][$id];
+    }
+
+    /** Fictitious secret link, stable per cleaning (as Rocket Place: generated on first request). @param array<string, mixed> $s @return array<string, mixed> */
+    private function cleaningLink(array $s, string $id): array
+    {
+        $s['cleanings'][$id] ?? throw new HttpException(404, 'Ménage introuvable.');
+        $path = '/m/demo-'.substr(hash('sha256', $id), 0, 24);
+
+        return ['url' => 'https://place.demo.invalid'.$path, 'path' => $path, 'expiresAt' => (new \DateTimeImmutable('+30 days'))->format(\DATE_ATOM)];
     }
 
     /** @param array<string, mixed> $s @param array<string, mixed> $json @return array<string, mixed> */

@@ -64,7 +64,6 @@ final class BookingEmailTest extends WebTestCase
     public function testSendOnlyOnceAndOnlyWithAGuestAddress(): void
     {
         $vignes = $this->property('Les vignes');
-        $port = $this->property('Le port');
         $payload = ['subject' => 'Votre arrivée', 'text' => "Bonjour Paul,\nÀ bientôt !", 'messageId' => '0192f7c4-1111-7000-8000-000000000001'];
 
         $sent = $this->api('POST', "/api/properties/$vignes/bookings/4/emails", $payload, $this->user);
@@ -77,7 +76,7 @@ final class BookingEmailTest extends WebTestCase
         self::assertCount(1, $recorded);
         self::assertSame(['paul.demo@example.org'], $recorded[0]['to']);
 
-        $this->api('POST', "/api/properties/$port/bookings/3/emails", ['messageId' => '0192f7c4-1111-7000-8000-000000000002'] + $payload, $this->user);
+        $this->api('POST', "/api/properties/$vignes/bookings/6/emails", ['messageId' => '0192f7c4-1111-7000-8000-000000000002'] + $payload, $this->user);
         $this->assertStatus(422); // Lodgify gives no e-mail for this guest
         $this->api('POST', "/api/properties/$vignes/bookings/4/emails", ['subject' => '', 'text' => 'x', 'messageId' => '0192f7c4-1111-7000-8000-000000000003'], $this->user);
         $this->assertStatus(422);

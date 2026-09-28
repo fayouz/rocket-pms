@@ -39,6 +39,13 @@ final class ApplicationAccessTest extends WebTestCase
             $this->api('GET', $uri, null, $app);
             $this->assertStatus(200);
         }
+
+        $this->api('POST', '/api/planning/run', null, $app);
+        $this->assertStatus(200);
+        $cleanings = $this->api('GET', "/api/properties/$port/cleanings", null, $app);
+        $this->assertStatus(200);
+        $this->api('GET', "/api/properties/$port/cleanings/{$cleanings[0]['id']}/link", null, $app);
+        $this->assertStatus(200);
     }
 
     public function testApplicationTokenCannotReachAdministrationOrSecrets(): void

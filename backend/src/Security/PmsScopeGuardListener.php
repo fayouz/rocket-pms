@@ -11,14 +11,14 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 
 /**
  * rocket-core only lets an application that does not impersonate anyone call GET /api/me. PMS opens its own business
- * endpoints (properties, bookings, pricing, conversation, timeline and the Rocket Place proxies) to such applications,
+ * endpoints (properties, bookings, pricing, conversation, timeline, planning run, cleanings and their link, and the Rocket Place proxies) to such applications,
  * so a client (e.g. LoussaHousing) can drive PMS server-to-server; every other endpoint (users, applications,
  * connectors and their secrets, place links, settings…) stays guarded by rocket-core's listener.
  */
 #[AsDecorator(ScopeGuardListener::class)]
 final class PmsScopeGuardListener
 {
-    private const APPLICATION_PATTERN = '#^/api/(timeline|properties(/[^/]+(/(bookings(/[^/]+/(pricing|conversation|guest-link(/send)?|emails(/[^/]+)?))?|welcome-book(/(stats|rotate))?|bilan(\.csv)?|expenses(/import)?|timeline|locks|codes|domotique|access-grants(/[^/]+/(send|revoke))?|documents(/.*)?|stock(/[^/]+)?))?)?)$#';
+    private const APPLICATION_PATTERN = '#^/api/(timeline|planning/run|properties(/[^/]+(/(bookings(/[^/]+/(pricing|conversation|guest-link(/send)?|emails(/[^/]+)?))?|welcome-book(/(stats|rotate))?|bilan(\.csv)?|expenses(/import)?|timeline|locks|codes|domotique|access-grants(/[^/]+/(send|revoke))?|documents(/.*)?|stock(/[^/]+)?|cleanings(/[^/]+/link)?))?)?)$#';
 
     public function __construct(
         #[AutowireDecorated] private readonly ScopeGuardListener $inner,
