@@ -15,6 +15,8 @@ export default defineAppConfig({
     icon: 'i-lucide-building-2',
     // Login page subtitle.
     tagline: 'La gestion de tes locations courte durée : logements, réservations Lodgify, voyageurs ; serrures, domotique, documents et stock via Rocket Place.',
+    // Public pages (no account): guest welcome book and kiosk TV screen, by secret token.
+    publicPaths: ['/g/', '/tv/'],
     // Main menu: the domain pages ("label" entries start a group).
     navigation: [
       { label: 'Logements', type: 'label' },

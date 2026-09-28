@@ -16,6 +16,7 @@ const tabs = [
   { label: 'Domotique', value: 'domotique', icon: 'i-lucide-house-wifi' },
   { label: 'Documents', value: 'documents', icon: 'i-lucide-folder' },
   { label: 'Stock', value: 'stock', icon: 'i-lucide-package' },
+  { label: 'Livret & TV', value: 'livret', icon: 'i-lucide-book-open' },
   { label: 'Timeline', value: 'timeline', icon: 'i-lucide-git-commit-vertical' },
 ]
 const tab = computed({
@@ -50,6 +51,7 @@ const { data: timeline } = await useAsyncData(`property-timeline-${id.value}`, (
       <DomotiqueTab v-else-if="tab === 'domotique'" :key="`domotique-${property?.placeId}`" :property-id="id" />
       <DocumentsTab v-else-if="tab === 'documents'" :property-id="id" :place-id="property?.placeId ?? null" />
       <StockTab v-else-if="tab === 'stock'" :key="`stock-${property?.placeId}`" :property-id="id" />
+      <WelcomeBookTab v-else-if="tab === 'livret'" :property-id="id" />
       <UCard v-else>
         <p class="mb-4 text-sm text-muted">Les 3 derniers jours et les 45 prochains : séjours, codes clavier, passages à la serrure.</p>
         <EventTimeline v-if="timeline" :events="timeline.events" :now="timeline.now" />

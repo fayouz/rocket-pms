@@ -126,3 +126,34 @@ export interface Place { id: string, name: string, address: string | null, color
 
 export interface StockItem { id: string, name: string, asin: string | null, reorderQty: number, subscription: boolean }
 export interface StockLevel { id: string, place: string, item: string, level: 'ok' | 'low' | 'empty' }
+
+/** Sections of the welcome book (livret d'accueil), all optional; {{guest}} is replaced by the guest's first name. */
+export type WelcomeBookSection = 'welcomeText' | 'wifiSsid' | 'wifiPassword' | 'checkinInfo' | 'checkoutInfo' | 'accessDirections' | 'houseRules' | 'contacts' | 'localTips' | 'faq'
+
+export interface WelcomeBook {
+  content: Record<WelcomeBookSection, string>
+  tvToken: string
+  tvPath: string
+  updatedAt: string | null
+}
+
+/** Public guest page (/g/:token): first name only, keypad code only once sent to the lock. */
+export interface GuestWelcome {
+  property: string
+  latitude: number | null
+  longitude: number | null
+  guest: { firstName: string, arrival: string, departure: string, checkIn: string | null, checkOut: string | null }
+  access: { code: string, validFrom: string, validUntil: string } | null
+  content: Record<WelcomeBookSection, string>
+}
+
+/** Public TV screen (/tv/:token). */
+export interface TvWelcome {
+  property: string
+  latitude: number | null
+  longitude: number | null
+  today: string
+  guest: { firstName: string, departure: string, checkOut: string | null } | null
+  nextArrival: string | null
+  content: Partial<Record<WelcomeBookSection, string>>
+}
