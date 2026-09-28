@@ -3,6 +3,8 @@
 namespace App\Place;
 
 use App\Entity\Property;
+use Rocket\Core\Oidc\OidcException;
+use Rocket\Core\Suite\ServiceTokenProvider;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Mime\Part\DataPart;
@@ -18,18 +20,24 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Responses are streamed and capped (MAX_BYTES), errors mapped: 4xx of Place (404, 409, 422...) are passed through
  * with their message, token refused / 5xx / unreachable become a 502 with a clear French message.
+ *
+ * Suite mode (ROCKET_AUTH_URL + ROCKET_AUTH_CLIENT_SECRET): calls carry an access token of Rocket Auth obtained with
+ * the client credentials grant for the audience "rocket-place" (rocket-core ServiceTokenProvider); ROCKET_PLACE_TOKEN
+ * stays the fallback (standalone mode, or Rocket Auth unreachable).
  */
 final class PlaceClient
 {
     private const TIMEOUT = 8;
     private const MAX_BYTES = 5 * 1024 * 1024;
     private const MAX_CONTENT_BYTES = 50 * 1024 * 1024;
+    private const AUDIENCE = 'rocket-place';
 
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly DemoPlace $demo,
         private readonly string $placeUrl,
         private readonly string $placeToken,
+        private readonly ?ServiceTokenProvider $serviceTokens = null,
     ) {
     }
 
@@ -41,7 +49,29 @@ final class PlaceClient
 
     public function isDemo(): bool
     {
-        return '' === trim($this->placeUrl) || '' === trim($this->placeToken);
+        return '' === trim($this->placeUrl) || ('' === trim($this->placeToken) && !$this->usesSuiteTokens());
+    }
+
+    /** Whether calls use tokens of Rocket Auth (suite mode) rather than the static ROCKET_PLACE_TOKEN. */
+    public function usesSuiteTokens(): bool
+    {
+        return null !== $this->serviceTokens && $this->serviceTokens->isAvailable();
+    }
+
+    /** Bearer of the next call: a token of Rocket Auth in suite mode, else (or if Rocket Auth fails) the static token. */
+    private function bearer(): string
+    {
+        if ($this->usesSuiteTokens()) {
+            try {
+                return $this->serviceTokens->tokenForClient(self::AUDIENCE);
+            } catch (OidcException $e) {
+                if ('' === trim($this->placeToken)) {
+                    throw new HttpException(502, 'Rocket Auth ne délivre pas de jeton pour Rocket Place : '.$e->getMessage());
+                }
+            }
+        }
+
+        return $this->placeToken;
     }
 
     /**
@@ -97,7 +127,7 @@ final class PlaceClient
     /** @param array<string, mixed> $options */
     private function send(string $method, string $path, array $options, int $maxBytes): string
     {
-        $options['headers'] = ($options['headers'] ?? []) + ['Authorization' => 'Bearer '.$this->placeToken];
+        $options['headers'] = ($options['headers'] ?? []) + ['Authorization' => 'Bearer '.$this->bearer()];
         $options['timeout'] = self::TIMEOUT;
         try {
             $response = $this->http->request($method, rtrim($this->placeUrl, '/').$path, $options);
@@ -116,6 +146,10 @@ final class PlaceClient
             throw new HttpException(502, 'Rocket Place ne répond pas ou est injoignable depuis le serveur.');
         }
         if (401 === $status) {
+            if ($this->usesSuiteTokens()) {
+                $this->serviceTokens->forget(self::AUDIENCE);
+                throw new HttpException(502, 'Jeton Rocket Auth refusé par Rocket Place (client rocket-pms lié à une application ?).');
+            }
             throw new HttpException(502, 'Jeton Rocket Place refusé (ROCKET_PLACE_TOKEN).');
         }
         if (403 === $status) {
