@@ -67,6 +67,7 @@ final class WelcomeBookViews
     {
         $property = $book->getProperty();
         $today = $this->planner->today();
+        $now = new \DateTimeImmutable();
         $current = null;
         $next = null;
         foreach ($this->planner->bookingsOf($property) as $b) {
@@ -75,7 +76,9 @@ final class WelcomeBookViews
             }
             if ($b->arrival <= $today && $b->departure > $today) {
                 $current = $b;
-            } elseif ($b->arrival > $today && (null === $next || $b->arrival < $next->arrival)) {
+            }
+            // Next check-in still to come, today's included (the screen reloads 30 minutes before it)
+            if ($this->arrivalAt($b) > $now && (null === $next || $b->arrival < $next->arrival)) {
                 $next = $b;
             }
         }

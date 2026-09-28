@@ -243,8 +243,9 @@ final class WelcomeBookTest extends WebTestCase
         $port = $this->port();
         $book = $this->api('GET', "/api/properties/$port/welcome-book", null, $this->user);
         $tv = $this->api('GET', '/api/public/tv/'.$book['tvToken']);
-        // Next arrival of Le port: booking 5 (Anna), in 8 days at 15:00, reload at 14:30
-        $arrival = (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Paris')))->modify('+8 days 15:00');
+        // Next check-in of Le port: booking 3 (Sofia) today at 15:00 if still to come, else booking 5 (Anna) in 8 days
+        $today = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Paris'));
+        $arrival = $today->modify('15:00') > new \DateTimeImmutable() ? $today->modify('15:00') : $today->modify('+8 days 15:00');
         self::assertEquals($arrival, new \DateTimeImmutable($tv['nextArrivalAt']));
         self::assertEquals($arrival->modify('-30 minutes'), new \DateTimeImmutable($tv['reloadAt']));
     }
