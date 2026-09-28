@@ -5,6 +5,7 @@ Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https:/
 ## [Non publié]
 
 ### Ajouté
+- **Livret d'accueil et écran TV** (repris de LoussaHousing) : onglet **Livret & TV** d'un logement (rubriques Wi-Fi, arrivée, départ, accès, règlement, contacts, bonnes adresses, FAQ), lien voyageur secret par réservation `/g/<jeton>` (signé HMAC, actif de 2 jours avant l'arrivée au lendemain du départ, prénom seul, code de la porte affiché seulement une fois envoyé à la serrure), écran TV kiosque `/tv/<jeton>` (accueil, météo, Wi-Fi, départ ; jamais de code). Routes publiques `/api/public/guest|tv/…` limitées en débit. Migration : table `welcome_book`.
 - Mode suite documenté (Rocket Auth : connexion, sélecteur d'applications, déconnexion ; variables `ROCKET_AUTH_*`, `ROCKET_PUBLIC_URL`, `ROCKET_INTERNAL_URL`).
 - Rocket Place appelé avec un jeton Rocket Auth en mode suite (client credentials, audience `rocket-place`) ; `ROCKET_PLACE_TOKEN` reste le repli.
 - `compose.suite.yaml` : Rocket Auth, Rocket Cloud (depuis les dépôts rocket-middleware voisins), Rocket Place et Rocket PMS en mode suite, avec données de démo et applications liées aux clients Rocket Auth.
