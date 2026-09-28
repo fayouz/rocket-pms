@@ -2,6 +2,13 @@
 
 Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- Mode suite documenté (Rocket Auth : connexion, sélecteur d'applications, déconnexion ; variables `ROCKET_AUTH_*`, `ROCKET_PUBLIC_URL`, `ROCKET_INTERNAL_URL`).
+- Rocket Place appelé avec un jeton Rocket Auth en mode suite (client credentials, audience `rocket-place`) ; `ROCKET_PLACE_TOKEN` reste le repli.
+- `compose.suite.yaml` : Rocket Auth, Rocket Cloud (depuis les dépôts rocket-middleware voisins), Rocket Place et Rocket PMS en mode suite, avec données de démo et applications liées aux clients Rocket Auth.
+
 ## [0.2.0] - 2026-09-28
 
 ### Modifié

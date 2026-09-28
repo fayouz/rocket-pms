@@ -5,7 +5,7 @@ Gestion de locations courte durée (logements, réservations Lodgify), **applica
 ## Repères
 - `app_id` `pms`, jetons d'application `rpm_…`, ports front 3700 · api 8700 · docs 3701.
 - Domaine : `Property` (logement lié à un logement Lodgify et, via `placeId`, à un lieu Rocket Place). Les réservations, messages et devis ne sont **jamais stockés** : lus chez Lodgify (`Lodgify/LodgifyClient` + `DemoLodgify`, cache 5 min ; `Lodgify/BookingProviderRegistry` : connecteur Lodgify du logement, sinon `LODGIFY_API_KEY`).
-- Rocket Place : `Place/PlaceClient` (`ROCKET_PLACE_URL` + `ROCKET_PLACE_TOKEN` `rpl_…`, Bearer, réponses streamées plafonnées, erreurs 4xx relayées, 401/403/5xx/réseau → 502) ; vides : `Place/DemoPlace` (fichier `var/demo-place-<env>.json`, aucun réseau, `reset()` en test). `Controller/PlaceProxyController` relaie `/api/properties/{id}/locks|codes|access-grants|domotique|documents…|stock` vers `/api/places/{placeId}/…` (409 sans `placeId`) ; `Controller/PlaceLinkController` (admin) : `/api/places`, `PUT|POST /api/properties/{id}/place`, `/api/locks`.
+- Rocket Place : `Place/PlaceClient` (`ROCKET_PLACE_URL` + `ROCKET_PLACE_TOKEN` `rpl_…`, Bearer, réponses streamées plafonnées, erreurs 4xx relayées, 401/403/5xx/réseau → 502 ; en mode suite, jeton Rocket Auth `ServiceTokenProvider` audience `rocket-place`, jeton statique en repli) ; vides : `Place/DemoPlace` (fichier `var/demo-place-<env>.json`, aucun réseau, `reset()` en test). `Controller/PlaceProxyController` relaie `/api/properties/{id}/locks|codes|access-grants|domotique|documents…|stock` vers `/api/places/{placeId}/…` (409 sans `placeId`) ; `Controller/PlaceLinkController` (admin) : `/api/places`, `PUT|POST /api/properties/{id}/place`, `/api/locks`.
 - Accès : `Code/AccessCodePlanner` calcule un accès par séjour à venir (1 h avant l'arrivée / après le départ, fuseau `PMS_TIMEZONE`) et le prévoit dans Place avec `externalRef` = id de réservation (idempotent, verrou Symfony ; dates changées avant envoi : révoqué puis re-prévu) ; envoi à la serrure uniquement sur clic (`POST …/access-grants/{grantId}/send`). Timeline : `Timeline/TimelineBuilder`. Tableau de bord : `Dashboard/PropertiesSection`. Sondes : `Health/LodgifyProbe`, `Health/PlaceProbe`.
 - Connecteurs PMS : seul `Domotique/LodgifyPlugin` (entité `Connector`, `Domotique/PluginRegistry`, secrets = nom de variable `.env` `CONNECTOR_…`, `Domotique/SecretEnv`) ; `Controller/ConnectorController`.
 - Front : `pages/properties/[id].vue` (onglets Réservations, Infos, Serrures, Domotique, Documents, Stock, Timeline), `components/PropertyInfoTab.vue` (lieu Place + connecteurs Lodgify), `BookingsInbox.vue`, `LocksInbox.vue`, `DomotiqueTab.vue`, `DocumentsTab.vue`, `StockTab.vue`, `EventTimeline.vue` ; `pages/locks.vue` (admin : serrure → lieu) ; aides dans `utils/pms.ts`.
@@ -16,6 +16,9 @@ cd backend && php bin/console lint:container && php bin/console doctrine:schema:
 cd frontend && npm run lint && npm run typecheck
 cd docs && npm run lint && npm run typecheck && npm run generate   # si docs/ a changé
 ```
+
+## Suite
+`compose.suite.yaml` : Auth + Cloud (dépôts rocket-middleware voisins, `ROCKET_AUTH_DIR`, `ROCKET_CLOUD_DIR`) + Place (`ROCKET_PLACE_DIR`) + PMS en mode suite ; `suite-link` lie les clients `rocket-place` (dans Cloud) et `rocket-pms` (dans Place). Ne jamais modifier les dépôts rocket-middleware depuis ici.
 
 ## Pièges connus
 - Envoi de messages aux voyageurs et envoi de codes aux serrures : actions réelles chez Lodgify / Rocket Place, jamais en test ni sans clic de l'utilisateur.

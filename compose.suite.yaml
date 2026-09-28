@@ -1,0 +1,371 @@
+# Business apps in the Rocket suite — local demo only (known passwords, secrets and tokens). See docs/content/1.getting-started/4.suite.md.
+#   docker compose -f compose.suite.yaml up -d --build
+# Rocket Auth http://localhost:3100 · Rocket Cloud http://localhost:3200 · Rocket PMS http://localhost:3700 ·
+# Rocket Place http://localhost:3900. Sign in with a demo account of Rocket Auth.
+#
+# Rocket Auth and Rocket Cloud are built from sibling checkouts of rocket-middlewares (not modified here):
+#   ROCKET_AUTH_DIR  (default ../../rocket-middleware/rocket-auth)
+#   ROCKET_CLOUD_DIR (default ../../rocket-middleware/rocket-cloud)
+#   ROCKET_PLACE_DIR (default ../rocket-place)
+#
+# Calls between apps use tokens of Rocket Auth (client credentials), no static token:
+#   Rocket PMS → Rocket Place (audience rocket-place) · Rocket Place → Rocket Cloud (audience rocket-cloud).
+# suite-link declares the calling client as an application of the called app (what an administrator does in
+# Administration → Applications, field « Client Rocket Auth »).
+name: rocket-business-suite
+
+x-suite:
+  auth-url: &auth-url http://localhost:3100
+  build-args: &build-args
+    APP_VERSION: ${APP_VERSION:-suite}
+
+x-app-env: &app-env
+  APP_ENV: prod
+  MESSENGER_TRANSPORT_DSN: doctrine://default
+  JWT_PASSPHRASE: demo
+  DEMO_MODE: "1"
+  LDAP_ENABLED: "0"
+  ROCKET_AUTH_URL: *auth-url
+  ROCKET_AUTH_INTERNAL_URL: http://auth-api
+  ROCKET_AUTH_ADMIN_GROUP: rocket-admins
+  ROCKET_LOCAL_LOGIN: "0"
+
+x-seed-command: &seed-command
+  - sh
+  - -c
+  - |
+    php bin/console doctrine:database:create --if-not-exists --no-interaction
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+    php bin/console app:demo:seed
+    php bin/console rocket:suite:sync
+
+x-worker-command: &worker-command ["php", "bin/console", "messenger:consume", "async", "scheduler_default", "--time-limit=3600", "-vv"]
+
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "app", "-U", "app"]
+      interval: 5s
+      retries: 10
+    volumes:
+      - database_data:/var/lib/postgresql/data
+
+  # Directory of Rocket Auth (demo users and the group rocket-admins).
+  ldap:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: Example
+      LDAP_DOMAIN: example.org
+      LDAP_ADMIN_PASSWORD: adminpassword
+    volumes:
+      - ${ROCKET_AUTH_DIR:-../../rocket-middleware/rocket-auth}/docker/ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+
+  # ---------------------------------------------------------------- Rocket Auth
+  auth-seed:
+    build:
+      context: ${ROCKET_AUTH_DIR:-../../rocket-middleware/rocket-auth}/backend
+      target: prod
+      args: *build-args
+    image: rocket-business-suite-auth-api
+    environment: &auth-env
+      APP_ENV: prod
+      APP_SECRET: demo-business-suite-rocket-auth
+      JWT_PASSPHRASE: demo
+      DATABASE_URL: postgresql://app:app@database:5432/rocket_auth?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: doctrine://default
+      DEMO_MODE: "1"
+      DEMO_APP_TOKEN: raa_demo_rocket_auth_do_not_use_in_production
+      OIDC_ISSUER: *auth-url
+      FRONTEND_URL: *auth-url
+      LDAP_ENABLED: "1"
+      LDAP_URL: ldap://ldap:389
+      LDAP_BASE_DN: ou=people,dc=example,dc=org
+      LDAP_SEARCH_DN: cn=admin,dc=example,dc=org
+      LDAP_SEARCH_PASSWORD: adminpassword
+      LDAP_ADMIN_GROUP_DN: cn=rocket-admins,ou=groups,dc=example,dc=org
+      # client_id|name|secret|redirect URI|post-logout URI|home|icon
+      DEMO_OAUTH_CLIENTS: >-
+        rocket-cloud|Rocket Cloud|demo-rocket-cloud-client-secret|http://localhost:3200/auth/callback|http://localhost:3200/login?logged_out=1|http://localhost:3200|i-lucide-cloud;
+        rocket-place|Rocket Place|demo-rocket-place-client-secret|http://localhost:3900/auth/callback|http://localhost:3900/login?logged_out=1|http://localhost:3900|i-lucide-map-pin;
+        rocket-pms|Rocket PMS|demo-rocket-pms-client-secret|http://localhost:3700/auth/callback|http://localhost:3700/login?logged_out=1|http://localhost:3700|i-lucide-house
+    volumes:
+      - auth_jwt:/app/config/jwt
+      - auth_data:/app/var/data
+    command:
+      - sh
+      - -c
+      - |
+        php bin/console doctrine:database:create --if-not-exists --no-interaction
+        php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+        php bin/console app:demo:seed
+        for i in $$(seq 1 30); do php bin/console app:ldap:sync && exit 0; echo "LDAP not ready, retrying…"; sleep 2; done
+        exit 1
+    depends_on:
+      database:
+        condition: service_healthy
+      ldap:
+        condition: service_started
+
+  auth-api:
+    image: rocket-business-suite-auth-api
+    environment: *auth-env
+    volumes:
+      - auth_jwt:/app/config/jwt
+      - auth_data:/app/var/data
+    ports:
+      - "8100:80"
+    depends_on:
+      auth-seed:
+        condition: service_completed_successfully
+
+  auth-worker:
+    image: rocket-business-suite-auth-api
+    environment: *auth-env
+    command: *worker-command
+    restart: unless-stopped
+    volumes:
+      - auth_jwt:/app/config/jwt
+      - auth_data:/app/var/data
+    depends_on:
+      - auth-api
+
+  auth-front:
+    build:
+      context: ${ROCKET_AUTH_DIR:-../../rocket-middleware/rocket-auth}/frontend
+      args: *build-args
+    image: rocket-business-suite-auth-front
+    environment:
+      NUXT_PUBLIC_API_BASE: ""
+      NUXT_API_INTERNAL_BASE: http://auth-api:80
+    ports:
+      - "3100:3000"
+    depends_on:
+      - auth-api
+
+  # --------------------------------------------------------------- Rocket Cloud
+  cloud-seed:
+    build:
+      context: ${ROCKET_CLOUD_DIR:-../../rocket-middleware/rocket-cloud}/backend
+      target: prod
+      args: *build-args
+    image: rocket-business-suite-cloud-api
+    environment: &cloud-env
+      <<: *app-env
+      APP_SECRET: demo-business-suite-rocket-cloud
+      DATABASE_URL: postgresql://app:app@database:5432/rocket_cloud?serverVersion=16&charset=utf8
+      FRONTEND_URL: http://localhost:3200
+      ROCKET_INTERNAL_URL: http://cloud-api
+      DEMO_APP_TOKEN: rca_demo_rocket_cloud_do_not_use_in_production
+      ROCKET_AUTH_CLIENT_ID: rocket-cloud
+      ROCKET_AUTH_CLIENT_SECRET: demo-rocket-cloud-client-secret
+    volumes:
+      - cloud_jwt:/app/config/jwt
+      - cloud_data:/app/var/data
+    command: *seed-command
+    depends_on:
+      database:
+        condition: service_healthy
+
+  cloud-api:
+    image: rocket-business-suite-cloud-api
+    environment: *cloud-env
+    volumes:
+      - cloud_jwt:/app/config/jwt
+      - cloud_data:/app/var/data
+    depends_on:
+      cloud-seed:
+        condition: service_completed_successfully
+
+  cloud-worker:
+    image: rocket-business-suite-cloud-api
+    environment: *cloud-env
+    command: *worker-command
+    restart: unless-stopped
+    volumes:
+      - cloud_jwt:/app/config/jwt
+      - cloud_data:/app/var/data
+    depends_on:
+      - cloud-api
+
+  cloud-front:
+    build:
+      context: ${ROCKET_CLOUD_DIR:-../../rocket-middleware/rocket-cloud}/frontend
+      args: *build-args
+    image: rocket-business-suite-cloud-front
+    environment:
+      NUXT_PUBLIC_API_BASE: ""
+      NUXT_API_INTERNAL_BASE: http://cloud-api:80
+    ports:
+      - "3200:3000"
+    depends_on:
+      - cloud-api
+
+  # --------------------------------------------------------------- Rocket Place
+  place-seed:
+    build:
+      context: ${ROCKET_PLACE_DIR:-../rocket-place}/backend
+      target: prod
+      args: *build-args
+    image: rocket-business-suite-place-api
+    environment: &place-env
+      <<: *app-env
+      APP_SECRET: demo-business-suite-rocket-place
+      DATABASE_URL: postgresql://app:app@database:5432/rocket_place?serverVersion=16&charset=utf8
+      FRONTEND_URL: http://localhost:3900
+      ROCKET_INTERNAL_URL: http://place-api
+      ROCKET_AUTH_CLIENT_ID: rocket-place
+      ROCKET_AUTH_CLIENT_SECRET: demo-rocket-place-client-secret
+      # Documents in Rocket Cloud, with a token of Rocket Auth (no ROCKET_CLOUD_TOKEN needed).
+      ROCKET_CLOUD_URL: http://cloud-api
+      NUKI_API_TOKEN: ""
+    volumes:
+      - place_jwt:/app/config/jwt
+      - place_data:/app/var/data
+    command: *seed-command
+    depends_on:
+      database:
+        condition: service_healthy
+
+  place-api:
+    image: rocket-business-suite-place-api
+    environment: *place-env
+    volumes:
+      - place_jwt:/app/config/jwt
+      - place_data:/app/var/data
+    depends_on:
+      place-seed:
+        condition: service_completed_successfully
+      suite-link:
+        condition: service_completed_successfully
+
+  place-worker:
+    image: rocket-business-suite-place-api
+    environment: *place-env
+    command: *worker-command
+    restart: unless-stopped
+    volumes:
+      - place_jwt:/app/config/jwt
+      - place_data:/app/var/data
+    depends_on:
+      - place-api
+
+  place-front:
+    build:
+      context: ${ROCKET_PLACE_DIR:-../rocket-place}/frontend
+      args: *build-args
+    image: rocket-business-suite-place-front
+    environment:
+      NUXT_PUBLIC_API_BASE: ""
+      NUXT_API_INTERNAL_BASE: http://place-api:80
+    ports:
+      - "3900:3000"
+    depends_on:
+      - place-api
+
+  # One-shot: application "Rocket Place" in Rocket Cloud (client rocket-place) and application "Rocket PMS" in
+  # Rocket Place (client rocket-pms). Never an administrator, no impersonation.
+  suite-link:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: database
+      PGUSER: app
+      PGPASSWORD: app
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        link() {
+          psql -v ON_ERROR_STOP=1 -d "$$1" -c "INSERT INTO application (id, name, description, token_hash, token_hint, can_impersonate, enabled, allowed_origins, oauth_client_id, created_at, updated_at)
+            VALUES (gen_random_uuid(), '$$2', 'Client Rocket Auth $$3 (suite)', encode(sha256(gen_random_uuid()::text::bytea), 'hex'), 'suite', false, true, '[]', '$$3', now(), now())
+            ON CONFLICT (oauth_client_id) DO NOTHING"
+        }
+        link rocket_cloud 'Rocket Place' rocket-place
+        link rocket_place 'Rocket PMS' rocket-pms
+    depends_on:
+      cloud-seed:
+        condition: service_completed_successfully
+      place-seed:
+        condition: service_completed_successfully
+
+  # ----------------------------------------------------------------- Rocket PMS
+  pms-seed:
+    build:
+      context: ./backend
+      target: prod
+      args: *build-args
+    image: rocket-business-suite-pms-api
+    environment: &pms-env
+      <<: *app-env
+      APP_SECRET: demo-business-suite-rocket-pms
+      DATABASE_URL: postgresql://app:app@database:5432/rocket_pms?serverVersion=16&charset=utf8
+      FRONTEND_URL: http://localhost:3700
+      ROCKET_INTERNAL_URL: http://pms-api
+      ROCKET_AUTH_CLIENT_ID: rocket-pms
+      ROCKET_AUTH_CLIENT_SECRET: demo-rocket-pms-client-secret
+      # Rocket Place with a token of Rocket Auth (no ROCKET_PLACE_TOKEN needed). Lodgify stays in demo.
+      ROCKET_PLACE_URL: http://place-api
+      LODGIFY_API_KEY: ""
+      PMS_TIMEZONE: Europe/Paris
+    volumes:
+      - pms_jwt:/app/config/jwt
+      - pms_data:/app/var/data
+    command: *seed-command
+    depends_on:
+      database:
+        condition: service_healthy
+      auth-api:
+        condition: service_started
+      place-api:
+        condition: service_started
+
+  pms-api:
+    image: rocket-business-suite-pms-api
+    environment: *pms-env
+    volumes:
+      - pms_jwt:/app/config/jwt
+      - pms_data:/app/var/data
+    depends_on:
+      pms-seed:
+        condition: service_completed_successfully
+
+  pms-worker:
+    image: rocket-business-suite-pms-api
+    environment: *pms-env
+    command: *worker-command
+    restart: unless-stopped
+    volumes:
+      - pms_jwt:/app/config/jwt
+      - pms_data:/app/var/data
+    depends_on:
+      - pms-api
+
+  pms-front:
+    build:
+      context: ./frontend
+      args: *build-args
+    image: rocket-business-suite-pms-front
+    environment:
+      NUXT_PUBLIC_API_BASE: ""
+      NUXT_API_INTERNAL_BASE: http://pms-api:80
+    ports:
+      - "3700:3000"
+    depends_on:
+      - pms-api
+
+volumes:
+  database_data:
+  auth_jwt:
+  auth_data:
+  cloud_jwt:
+  cloud_data:
+  place_jwt:
+  place_data:
+  pms_jwt:
+  pms_data:
