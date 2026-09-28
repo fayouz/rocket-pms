@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /** Timeline of one property or of all of them: ?past=<days> (default 3, max 30), ?future=<days> (default 45, max 120). */
-#[IsGranted('ROLE_USER')]
+#[IsGranted('PMS_READ')]
 final class TimelineController extends AbstractController
 {
     public function __construct(private readonly TimelineBuilder $builder)

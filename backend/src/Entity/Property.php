@@ -26,12 +26,12 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(uriTemplate: '/properties'),
         new Get(uriTemplate: '/properties/{id}'),
-        new Post(uriTemplate: '/properties', security: "is_granted('ROLE_ADMIN')"),
-        new Patch(uriTemplate: '/properties/{id}', security: "is_granted('ROLE_ADMIN')"),
+        new Post(uriTemplate: '/properties', security: "is_granted('PMS_MANAGE')"),
+        new Patch(uriTemplate: '/properties/{id}', security: "is_granted('PMS_MANAGE')"),
     ],
     normalizationContext: ['groups' => ['property:read', 'tracking']],
     denormalizationContext: ['groups' => ['property:write']],
-    security: "is_granted('ROLE_USER')",
+    security: "is_granted('PMS_READ')",
     order: ['name' => 'ASC'],
     paginationEnabled: false,
 )]

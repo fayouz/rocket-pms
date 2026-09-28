@@ -21,7 +21,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * locks, access grants (keypad codes of the stays), domotique, documents, stock. A property without a place answers
  * 409 with a clear message. Reads: any user; writes: admin (sending a code: any user, always on an explicit click).
  */
-#[IsGranted('ROLE_USER')]
+#[IsGranted('PMS_READ')]
 final class PlaceProxyController extends AbstractController
 {
     private const ID = ['id' => Requirement::UUID];
@@ -73,7 +73,7 @@ final class PlaceProxyController extends AbstractController
     }
 
     #[Route('/api/properties/{id}/access-grants/{grantId}/revoke', name: 'api_property_access_grant_revoke', methods: ['POST'], requirements: ['id' => Requirement::UUID, 'grantId' => Requirement::UUID])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function revoke(#[MapEntity] Property $property, string $grantId): JsonResponse
     {
         $base = $this->base($property);
@@ -100,7 +100,7 @@ final class PlaceProxyController extends AbstractController
     }
 
     #[Route('/api/properties/{id}/documents/folders', name: 'api_property_documents_create_folder', methods: ['POST'], requirements: self::ID)]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function createFolder(#[MapEntity] Property $property, Request $request): JsonResponse
     {
         $body = $request->toArray();
@@ -109,7 +109,7 @@ final class PlaceProxyController extends AbstractController
     }
 
     #[Route('/api/properties/{id}/documents/upload', name: 'api_property_documents_upload', methods: ['POST'], requirements: self::ID)]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function upload(#[MapEntity] Property $property, Request $request): JsonResponse
     {
         $file = $request->files->get('file');
@@ -122,7 +122,7 @@ final class PlaceProxyController extends AbstractController
     }
 
     #[Route('/api/properties/{id}/documents/{itemId}', name: 'api_property_documents_update', methods: ['PATCH'], requirements: ['id' => Requirement::UUID, 'itemId' => '[a-z]+:[\w-]+'])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function updateDocument(#[MapEntity] Property $property, string $itemId, Request $request): JsonResponse
     {
         $body = array_intersect_key($request->toArray(), ['name' => 1, 'folder' => 1]);
@@ -131,7 +131,7 @@ final class PlaceProxyController extends AbstractController
     }
 
     #[Route('/api/properties/{id}/documents/{itemId}', name: 'api_property_documents_delete', methods: ['DELETE'], requirements: ['id' => Requirement::UUID, 'itemId' => '[a-z]+:[\w-]+'])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function deleteDocument(#[MapEntity] Property $property, string $itemId, Request $request): JsonResponse
     {
         $folder = (string) $request->query->get('folder', '');

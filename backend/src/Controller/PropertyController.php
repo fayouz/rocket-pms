@@ -22,7 +22,7 @@ use Symfony\Component\Uid\Uuid;
  * Bookings of a property (Lodgify), with their keypad code (an access grant of Rocket Place): list, value and price breakdown, conversation with the
  * guest (read and reply). Lodgify data is never stored, only read through the 5-minute cache.
  */
-#[IsGranted('ROLE_USER')]
+#[IsGranted('PMS_READ')]
 final class PropertyController extends AbstractController
 {
     public function __construct(
@@ -32,7 +32,7 @@ final class PropertyController extends AbstractController
     }
 
     #[Route('/api/properties/sync', name: 'api_properties_sync', methods: ['POST'])]
-    #[IsGranted('ROLE_ADMIN')]
+    #[IsGranted('PMS_MANAGE')]
     public function sync(PropertySync $sync): JsonResponse
     {
         return $this->json($sync->sync());
