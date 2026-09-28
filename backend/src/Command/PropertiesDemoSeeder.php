@@ -6,6 +6,7 @@ use App\Place\DemoPlace;
 use App\Place\PlaceClient;
 use App\Property\PropertySync;
 use App\Repository\PropertyRepository;
+use App\Repository\WelcomeBookRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Rocket\Core\Command\DemoSeederInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -23,6 +24,7 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
         private readonly PropertyRepository $properties,
         private readonly PlaceClient $place,
         private readonly EntityManagerInterface $em,
+        private readonly WelcomeBookRepository $books,
     ) {
     }
 
@@ -36,6 +38,18 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
                 continue;
             }
             $property->setColor($color);
+            $book = $this->books->forProperty($property);
+            if ('' === $book->getContent()['welcomeText']) {
+                $book->updateContent([
+                    'welcomeText' => "Bienvenue {{guest}} ! Toute l'équipe te souhaite un excellent séjour à ".$placeName.'.',
+                    'wifiSsid' => 'Demo-'.str_replace(' ', '', $placeName), 'wifiPassword' => 'bienvenue2026',
+                    'checkinInfo' => 'Arrivée à partir de 15 h. Le code de la porte apparaît ici dès qu’il est activé.',
+                    'checkoutInfo' => 'Départ avant 11 h : lave-vaisselle lancé, poubelles sorties, clés sur la table.',
+                    'houseRules' => "Non-fumeur. Pas de fête. Calme après 22 h.",
+                    'contacts' => 'Hôte : via la messagerie de ta réservation. Urgences : 112.',
+                    'localTips' => 'Boulangerie au coin de la rue, marché le samedi matin.',
+                ]);
+            }
             if ($this->place->isDemo()) {
                 $property->setPlaceId($demoPlaceId);
             } elseif (null === $property->getPlaceId() || \in_array($property->getPlaceId(), [DemoPlace::PORT, DemoPlace::VIGNES], true)) {

@@ -41,6 +41,8 @@ security:
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api/?$, roles: PUBLIC_ACCESS }
         - { path: ^/api/theme$, roles: PUBLIC_ACCESS }
+        # Welcome book guest page and TV screen: secret tokens, rate-limited (App\Controller\WelcomeBookController)
+        - { path: ^/api/public/(guest|tv)/, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

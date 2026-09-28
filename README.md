@@ -63,6 +63,7 @@ docker compose -f compose.suite.yaml up -d --build   # http://localhost:3700
 - **Logements** : créés depuis Lodgify (« Synchroniser »), renommables, couleur repère.
 - **Réservations** d'un logement, façon client mail : recherche, filtre (en cours, à venir, passées, annulées), tri ; conversation Lodgify avec le voyageur et **réponse** (poussée par Lodgify sur Airbnb, Booking.com ou par e-mail, sans double envoi) ; **valeur** et détail du prix (devis Lodgify, hors commission de la plateforme).
 - **Rocket Place** : chaque logement est lié à un lieu (onglet Infos). Serrures (état, batterie, historique), domotique, documents et stock viennent de ce lieu, relayés par PMS. Un **code clavier** (accès Rocket Place) est prévu pour chaque séjour à venir (ouvert 1 h avant l'arrivée, fermé 1 h après le départ) et **envoyé à la serrure seulement sur un clic** confirmé ; un séjour commencé n'est jamais modifié.
+- **Livret d'accueil et écran TV** (onglet Livret & TV) : livret par logement, lien voyageur secret par séjour (`/g/…`, actif de J-2 à J+1, prénom seul, code de la porte seulement une fois envoyé à la serrure), écran TV en mode kiosque (`/tv/…`, sans code).
 - **Timeline** d'un logement ou de tous : séjours, codes, passages aux serrures.
 - **Tableau de bord** : arrivées et départs du jour, ménages entre deux séjours, occupation et revenus sur 30 jours, prochaines arrivées ; état des services Lodgify et Rocket Place.
 - **API** pour les applications externes (jeton `rpm_…`), par exemple LoussaHousing.
