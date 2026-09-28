@@ -52,7 +52,7 @@ export interface Pricing {
 
 export interface Message {
   key: string
-  kind: 'lodgify'
+  kind: 'lodgify' | 'email'
   from: 'host' | 'guest'
   at: string
   subject: string
@@ -156,4 +156,60 @@ export interface TvWelcome {
   guest: { firstName: string, departure: string, checkOut: string | null } | null
   nextArrival: string | null
   content: Partial<Record<WelcomeBookSection, string>>
+}
+
+/** Conversation of the Rocket Mailer shared inbox linked to a booking (guest e-mail or booking id in the subject). */
+export interface EmailConversation {
+  id: string
+  subject: string
+  status: string
+  participants: string[]
+  snippet: string
+  messageCount: number
+  lastMessageAt: string
+  unread: boolean
+  matchedBy: 'guest' | 'booking'
+}
+
+export interface BookingEmails {
+  demo: boolean
+  available: boolean
+  reason: string | null
+  guestEmail: string | null
+  conversations: EmailConversation[]
+}
+
+export interface Expense {
+  id: string
+  date: string
+  amount: number
+  category: string
+  categoryLabel: string
+  kind: 'charge' | 'income'
+  note: string
+  documentRef: string | null
+}
+
+export interface CategoryOption { value: string, label: string, kind: 'charge' | 'income' }
+
+export interface Bilan {
+  property: { id: string, name: string }
+  year: number
+  years: number[]
+  demo: boolean
+  currency: string
+  revenue: number
+  nights: number
+  stays: number
+  occupancy: number
+  daysConsidered: number
+  since: string | null
+  months: { label: string, revenue: number, nights: number, charges: number, income: number, result: number }[]
+  categories: { key: string, label: string, kind: 'charge' | 'income', total: number, count: number }[]
+  chargesTotal: number
+  otherIncome: number
+  entries: number
+  result: number
+  items: Expense[]
+  categoryOptions: CategoryOption[]
 }
