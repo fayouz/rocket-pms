@@ -99,6 +99,30 @@ final class PlaceClient
         return $this->decode($this->send($method, $path, $options, self::MAX_BYTES));
     }
 
+    /** Cleaning tasks of a place (Rocket Place cleanings). @return list<array<string, mixed>> */
+    public function cleanings(string $placeId): array
+    {
+        return array_values(array_filter($this->request('GET', '/api/places/'.$placeId.'/cleanings'), 'is_array'));
+    }
+
+    /**
+     * Find-or-create a cleaning task, idempotent by externalRef (201 created, 200 existing and unchanged).
+     *
+     * @param array{scheduledAt: string, dueAt?: string|null, label?: string, assigneeEmail?: string|null, notes?: string, externalRef: string} $cleaning
+     *
+     * @return array<mixed>
+     */
+    public function createCleaning(string $placeId, array $cleaning): array
+    {
+        return $this->request('POST', '/api/places/'.$placeId.'/cleanings', $cleaning);
+    }
+
+    /** Partial update of a cleaning task (scheduledAt, dueAt, status...). @param array<string, mixed> $changes @return array<mixed> */
+    public function updateCleaning(string $cleaningId, array $changes): array
+    {
+        return $this->request('PATCH', '/api/cleanings/'.$cleaningId, $changes);
+    }
+
     /** @return array<mixed> */
     public function upload(string $path, UploadedFile $file, ?string $folder): array
     {

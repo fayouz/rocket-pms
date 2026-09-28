@@ -9,7 +9,7 @@ use Symfony\Component\Uid\Uuid;
  * Rocket Place used whenever ROCKET_PLACE_URL / ROCKET_PLACE_TOKEN are not configured: a tiny in-process imitation of
  * the endpoints PMS uses (same paths, same JSON shapes), so the app and its functional tests stay fully offline.
  * State is kept in a small JSON file (var/demo-place-<env>.json) since, like a real HTTP call, it must survive across
- * requests. Two demo places ("Le port", "Les vignes") each with one fictitious lock; nothing is ever sent to a lock.
+ * requests (cleanings included, find-or-create by externalRef as the real API). Two demo places ("Le port", "Les vignes") each with one fictitious lock; nothing is ever sent to a lock.
  */
 final class DemoPlace
 {
@@ -55,6 +55,9 @@ final class DemoPlace
             $route('POST', "/api/places/$uuid/access-grants") => $this->planGrant($s, $m[1], $json),
             $route('POST', "/api/access-grants/$uuid/send") => $this->grant($s, $m[1]) && throw new HttpException(400, 'Mode démo (ROCKET_PLACE_URL non configuré) : aucun code n’est envoyé à la serrure.'),
             $route('POST', "/api/access-grants/$uuid/revoke") => $this->revokeGrant($s, $m[1]),
+            $route('GET', "/api/places/$uuid/cleanings") => array_values(array_filter($s['cleanings'] ?? [], fn (array $c) => $c['placeId'] === $this->place($s, $m[1])['id'])),
+            $route('POST', "/api/places/$uuid/cleanings") => $this->createCleaning($s, $m[1], $json),
+            $route('PATCH', "/api/cleanings/$uuid") => $this->patchCleaning($s, $m[1], $json),
             $route('GET', "/api/places/$uuid/domotique") => $this->domotique($s, $m[1]),
             $route('GET', "/api/places/$uuid/documents") => $this->documents($s, $m[1], (string) ($query['folder'] ?? '')),
             $route('POST', "/api/places/$uuid/documents/folders") => $this->addDocument($s, $m[1], 'folder', (string) ($json['name'] ?? ''), null, $json['folder'] ?? null),
@@ -191,6 +194,71 @@ final class DemoPlace
         return $s['grants'][$id];
     }
 
+    /** Find-or-create by externalRef, as Rocket Place (201 new, 200 existing unchanged). @param array<string, mixed> $s @param array<string, mixed> $json @return array<string, mixed> */
+    private function createCleaning(array &$s, string $placeId, array $json): array
+    {
+        $place = $this->place($s, $placeId);
+        $s['cleanings'] ??= [];
+        $ref = null === ($json['externalRef'] ?? null) ? null : mb_substr(trim((string) $json['externalRef']), 0, 120);
+        foreach ($s['cleanings'] as $c) {
+            if (null !== $ref && $c['placeId'] === $place['id'] && $c['externalRef'] === $ref) {
+                return $c;
+            }
+        }
+        $at = self::cleaningDate($json['scheduledAt'] ?? null) ?? throw new HttpException(422, 'scheduledAt requis.');
+        $due = self::cleaningDate($json['dueAt'] ?? null);
+        if (null !== $due && $due < $at) {
+            throw new HttpException(422, 'dueAt doit suivre scheduledAt.');
+        }
+        $id = Uuid::v7()->toRfc4122();
+        $s['cleanings'][$id] = [
+            'id' => $id, 'placeId' => $place['id'], 'placeName' => $place['name'], 'label' => mb_substr(trim((string) ($json['label'] ?? '')) ?: 'Ménage', 0, 120),
+            'scheduledAt' => $at->format(\DATE_ATOM), 'dueAt' => $due?->format(\DATE_ATOM), 'status' => 'todo', 'late' => false,
+            'assignee' => null === ($json['assigneeEmail'] ?? null) ? null : ['id' => null, 'email' => (string) $json['assigneeEmail'], 'name' => (string) $json['assigneeEmail']],
+            'externalRef' => $ref, 'notes' => null === ($json['notes'] ?? null) ? null : (string) $json['notes'],
+            'checklist' => [], 'photos' => [], 'stockReports' => [], 'startedAt' => null, 'completedAt' => null,
+        ];
+
+        return $s['cleanings'][$id];
+    }
+
+    /** @param array<string, mixed> $s @param array<string, mixed> $json @return array<string, mixed> */
+    private function patchCleaning(array &$s, string $id, array $json): array
+    {
+        $c = $s['cleanings'][$id] ?? throw new HttpException(404, 'Ménage introuvable.');
+        if (isset($json['scheduledAt'])) {
+            $c['scheduledAt'] = (self::cleaningDate($json['scheduledAt']) ?? throw new HttpException(422, 'scheduledAt invalide.'))->format(\DATE_ATOM);
+        }
+        if (\array_key_exists('dueAt', $json)) {
+            $due = self::cleaningDate($json['dueAt']);
+            if (null !== $due && $due < new \DateTimeImmutable($c['scheduledAt'])) {
+                throw new HttpException(422, 'dueAt doit suivre scheduledAt.');
+            }
+            $c['dueAt'] = $due?->format(\DATE_ATOM);
+        }
+        if (\array_key_exists('status', $json)) {
+            if (!\in_array($json['status'], ['todo', 'in_progress', 'done', 'cancelled'], true)) {
+                throw new HttpException(422, 'Statut invalide.');
+            }
+            $c['status'] = $json['status'];
+        }
+        $s['cleanings'][$id] = $c;
+
+        return $c;
+    }
+
+    private static function cleaningDate(mixed $value): ?\DateTimeImmutable
+    {
+        if (!\is_string($value) || '' === $value) {
+            return null;
+        }
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            throw new HttpException(422, 'Date invalide.');
+        }
+    }
+
     /** @param array<string, mixed> $s @return array<string, mixed> */
     private function domotique(array $s, string $placeId): array
     {
@@ -322,6 +390,7 @@ final class DemoPlace
             ],
             'grants' => [],
             'documents' => [],
+            'cleanings' => [],
             'stockItems' => $items,
             'stockLevels' => $levels,
         ];

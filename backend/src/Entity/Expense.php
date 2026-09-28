@@ -17,6 +17,7 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: ExpenseRepository::class)]
 #[ORM\Index(columns: ['property_id', 'date'])]
+#[ORM\UniqueConstraint(name: 'expense_import_unique', columns: ['property_id', 'source', 'external_id'])]
 class Expense
 {
     /** category => [label, kind] ; kind "charge" or "income" (other income than the Lodgify bookings). */
@@ -29,6 +30,7 @@ class Expense
         'entretien' => ['Entretien et réparations', 'charge'],
         'travaux' => ['Travaux et équipement', 'charge'],
         'taxes' => ['Impôts et taxes', 'charge'],
+        'taxe_sejour' => ['Taxe de séjour', 'charge'],
         'frais_plateformes' => ['Frais de plateformes', 'charge'],
         'credit' => ['Crédit et frais bancaires', 'charge'],
         'copropriete' => ['Copropriété et loyer', 'charge'],
@@ -60,6 +62,13 @@ class Expense
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $documentRef = null;
 
+    /** Imported platform statement line (App\Bilan\StatementImporter): its source and id there, unique per property (dedup). */
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $source = null;
+
+    #[ORM\Column(length: 200, nullable: true)]
+    private ?string $externalId = null;
+
     use TrackedTrait;
 
     public function __construct(Property $property)
@@ -76,6 +85,17 @@ class Expense
     public function getCategory(): string { return $this->category; }
     public function getNote(): string { return $this->note; }
     public function getDocumentRef(): ?string { return $this->documentRef; }
+
+    public function getSource(): ?string { return $this->source; }
+    public function getExternalId(): ?string { return $this->externalId; }
+
+    public function markImported(string $source, string $externalId): static
+    {
+        $this->source = $source;
+        $this->externalId = $externalId;
+
+        return $this;
+    }
 
     public function isIncome(): bool
     {
@@ -132,7 +152,7 @@ class Expense
         return [
             'id' => $this->id->toRfc4122(), 'date' => $this->date->format('Y-m-d'), 'amount' => $this->amountCents / 100,
             'category' => $this->category, 'categoryLabel' => self::CATEGORIES[$this->category][0], 'kind' => self::CATEGORIES[$this->category][1],
-            'note' => $this->note, 'documentRef' => $this->documentRef,
+            'note' => $this->note, 'documentRef' => $this->documentRef, 'source' => $this->source, 'externalId' => $this->externalId,
         ];
     }
 }

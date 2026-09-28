@@ -3,12 +3,14 @@
 namespace App\Controller;
 
 use App\Bilan\BilanBuilder;
+use App\Bilan\StatementImporter;
 use App\Entity\Expense;
 use App\Entity\Property;
 use App\Repository\ExpenseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -74,6 +76,29 @@ final class BilanController extends AbstractController
         $this->em->flush();
 
         return $this->json($expense->toArray(), 201);
+    }
+
+    /**
+     * Import of a platform statement: multipart "file" (CSV, ; or , separated, 2 MB max, header
+     * externalId;date;kind;amount;label;bookingRef) and "source" (airbnb, booking...). Dedup by source + externalId.
+     */
+    #[Route('/api/properties/{id}/expenses/import', name: 'api_property_expense_import', methods: ['POST'], requirements: ['id' => Requirement::UUID])]
+    #[IsGranted('PMS_MANAGE')]
+    public function import(#[MapEntity] Property $property, Request $request, StatementImporter $importer): JsonResponse
+    {
+        $file = $request->files->get('file');
+        if (!$file instanceof UploadedFile || !$file->isValid()) {
+            throw new HttpException(422, 'file : fichier CSV requis.');
+        }
+        if ($file->getSize() > 2 * 1024 * 1024) {
+            throw new HttpException(422, 'file : 2 Mo au plus.');
+        }
+        $csv = (string) file_get_contents($file->getPathname());
+        if (!mb_check_encoding($csv, 'UTF-8')) {
+            $csv = mb_convert_encoding($csv, 'UTF-8', 'Windows-1252');
+        }
+
+        return $this->json($importer->import($property, mb_strtolower(trim($request->request->getString('source'))), $csv));
     }
 
     #[Route('/api/expenses/{id}', name: 'api_expense_update', methods: ['PATCH'], requirements: ['id' => Requirement::UUID])]

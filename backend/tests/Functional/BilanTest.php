@@ -6,6 +6,7 @@ use App\Place\DemoPlace;
 use App\Tests\ApiTestTrait;
 use App\Tests\Support\HttpMock;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /** Bilan of a property: Lodgify revenue night by night (demo Lodgify) + accounting entries (CRUD, admin only), CSV export. No network. */
 final class BilanTest extends WebTestCase
@@ -89,6 +90,57 @@ final class BilanTest extends WebTestCase
         self::assertStringContainsString('Mars;', $csv);
         self::assertStringContainsString("'=cmd", $csv, 'formula injection neutralised');
         self::assertStringContainsString('bilan-le-port-'.$year.'.csv', (string) $this->client->getResponse()->headers->get('Content-Disposition'));
+    }
+
+    public function testImportOfPlatformStatements(): void
+    {
+        $port = $this->port();
+        $csv = "externalId;date;kind;amount;label;bookingRef\n"
+            ."A1;2026-03-02;fee;-18,50;Commission Airbnb;HM123\n"
+            ."A2;05/03/2026;tourist_tax;7.20;Taxe de séjour;HM123\n"
+            ."A3;2026-03-06;payout;300;Versement;HM123\n"
+            ."A4;2026-13-01;fee;3;Date fausse;\n"
+            ."A5;2026-03-07;bogus;3;Type inconnu;\n"
+            .";2026-03-07;fee;3;Sans id;\n";
+
+        $this->import($port, 'airbnb', $csv, $this->user);
+        $this->assertStatus(403);
+        $result = $this->import($port, 'airbnb', $csv, $this->admin);
+        $this->assertStatus(200);
+        self::assertSame(2, $result['inserted']);
+        self::assertSame(1, $result['skipped'], 'payouts are already counted from Lodgify');
+        self::assertSame([5, 6, 7], array_column($result['invalid'], 'line'));
+
+        $again = $this->import($port, 'airbnb', $csv, $this->admin);
+        self::assertSame(0, $again['inserted']);
+        self::assertSame(2, $again['duplicates'], 'same statement twice: nothing added');
+        self::assertSame(1, $again['skipped']);
+
+        $items = $this->api('GET', "/api/properties/$port/expenses?year=2026", null, $this->user)['items'];
+        $byId = array_column($items, null, 'externalId');
+        self::assertSame(18.5, $byId['A1']['amount']);
+        self::assertSame('frais_plateformes', $byId['A1']['category']);
+        self::assertSame('taxe_sejour', $byId['A2']['category']);
+        self::assertSame('2026-03-05', $byId['A2']['date']);
+        self::assertSame('airbnb', $byId['A2']['source']);
+        self::assertStringContainsString('HM123', $byId['A1']['note']);
+
+        // Another source may reuse the same ids; bad source and missing column are refused
+        self::assertSame(2, $this->import($port, 'booking', $csv, $this->admin)['inserted']);
+        $this->import($port, 'Airbnb!', $csv, $this->admin);
+        $this->assertStatus(422);
+        $this->import($port, 'airbnb', "id;date;amount\n1;2026-01-01;3\n", $this->admin);
+        $this->assertStatus(422);
+    }
+
+    /** @return array<mixed>|null */
+    private function import(string $property, string $source, string $csv, string $authorization): ?array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'csv');
+        file_put_contents($path, $csv);
+        $this->client->request('POST', "/api/properties/$property/expenses/import", ['source' => $source], ['file' => new UploadedFile($path, 'releve.csv', 'text/csv', null, true)], ['HTTP_AUTHORIZATION' => $authorization, 'HTTP_ACCEPT' => 'application/json']);
+
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
     private function port(): string

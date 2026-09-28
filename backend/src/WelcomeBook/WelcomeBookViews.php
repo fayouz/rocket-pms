@@ -47,22 +47,23 @@ final class WelcomeBookViews
     }
 
     /** @return array<string, mixed> */
-    public function guest(WelcomeBook $book, Booking $b): array
+    public function guest(WelcomeBook $book, Booking $b, string $lang = WelcomeBook::DEFAULT_LANGUAGE): array
     {
         $property = $book->getProperty();
 
         return [
             'property' => $property->getName(),
+            'lang' => $lang, 'languages' => $book->getLanguages(), 'style' => self::publicStyle($book),
             'latitude' => $property->getLatitude(), 'longitude' => $property->getLongitude(),
             'guest' => ['firstName' => self::firstName($b->guest), 'arrival' => $b->arrival, 'departure' => $b->departure,
                 'checkIn' => $b->checkIn, 'checkOut' => $b->checkOut],
             'access' => $this->sentAccess($book, $b),
-            'content' => self::personalise($book->getContent(), self::firstName($b->guest)),
+            'content' => self::personalise($book->getContentIn($lang), self::firstName($b->guest)),
         ];
     }
 
     /** @return array<string, mixed> */
-    public function tv(WelcomeBook $book): array
+    public function tv(WelcomeBook $book, string $lang = WelcomeBook::DEFAULT_LANGUAGE): array
     {
         $property = $book->getProperty();
         $today = $this->planner->today();
@@ -78,7 +79,7 @@ final class WelcomeBookViews
                 $next = $b;
             }
         }
-        $content = array_intersect_key($book->getContent(), array_flip(['welcomeText', 'wifiSsid', 'wifiPassword', 'checkoutInfo', 'houseRules', 'localTips', 'contacts']));
+        $content = array_intersect_key($book->getContentIn($lang), array_flip(['welcomeText', 'wifiSsid', 'wifiPassword', 'checkoutInfo', 'houseRules', 'localTips', 'contacts']));
 
         return [
             'property' => $property->getName(),
@@ -86,8 +87,26 @@ final class WelcomeBookViews
             'today' => $today,
             'guest' => null === $current ? null : ['firstName' => self::firstName($current->guest), 'departure' => $current->departure, 'checkOut' => $current->checkOut],
             'nextArrival' => $next?->arrival,
+            // The kiosk reloads itself 30 minutes before the next check-in, so the new guest is greeted by name
+            'nextArrivalAt' => null === $next ? null : $this->arrivalAt($next)->format(\DATE_ATOM),
+            'reloadAt' => null === $next ? null : $this->arrivalAt($next)->sub(new \DateInterval('PT30M'))->format(\DATE_ATOM),
+            'lang' => $lang, 'languages' => $book->getLanguages(), 'style' => self::publicStyle($book),
             'content' => self::personalise($content, null === $current ? null : self::firstName($current->guest)),
         ];
+    }
+
+    /** Check-in time of a booking (its check-in hour, 15:00 by default, PMS_TIMEZONE). */
+    public function arrivalAt(Booking $b): \DateTimeImmutable
+    {
+        return $this->planner->validity($b)[0]->add(new \DateInterval('PT1H'));
+    }
+
+    /** Visual customisation for the public pages: the cover is an https URL or, for a Place document, a flag (the page asks the public cover endpoint). @return array<string, mixed> */
+    public static function publicStyle(WelcomeBook $book): array
+    {
+        $style = $book->getStyle();
+
+        return ['accent' => $style['accent'], 'layout' => $style['layout'], 'coverUrl' => $style['coverUrl'], 'documentCover' => null !== $style['coverDocumentRef']];
     }
 
     public static function firstName(string $guest): string

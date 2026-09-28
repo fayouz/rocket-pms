@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Tests\Functional;
+
+use App\Place\DemoPlace;
+use App\Tests\ApiTestTrait;
+use App\Tests\Support\HttpMock;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+/**
+ * Cleanings after departure, planned in Rocket Place (demo) together with the access codes: one task per upcoming
+ * departure (externalRef "booking:<id>:checkout"), due at the next check-in, idempotent, moved when its dates drift,
+ * cancelled with its booking, shown in the timeline. No network call.
+ */
+final class CleaningTest extends WebTestCase
+{
+    use ApiTestTrait;
+
+    private string $admin;
+    private string $user;
+
+    protected function setUp(): void
+    {
+        $this->client = static::createClient();
+        static::getContainer()->get(DemoPlace::class)->reset();
+        HttpMock::reset();
+        $this->admin = 'Bearer '.$this->jwtFor($this->createUser('admin@example.org', ['ROLE_ADMIN']));
+        $this->user = 'Bearer '.$this->jwtFor($this->createUser('alice@example.org'));
+    }
+
+    protected function tearDown(): void
+    {
+        self::assertSame([], HttpMock::$requests, 'no outgoing HTTP request in demo mode');
+        parent::tearDown();
+    }
+
+    public function testCleaningPlannedAfterEachDeparture(): void
+    {
+        $port = $this->linked('Le port', DemoPlace::PORT);
+        $timeline = $this->api('GET', "/api/properties/$port/timeline", null, $this->user);
+        $this->assertStatus(200);
+
+        $cleanings = $this->cleanings(DemoPlace::PORT);
+        self::assertArrayHasKey('booking:3:checkout', $cleanings);
+        self::assertArrayHasKey('booking:5:checkout', $cleanings);
+        $tz = new \DateTimeZone('Europe/Paris');
+        $day = static fn (int $n, string $time) => (new \DateTimeImmutable('today', $tz))->modify("+$n days $time");
+        $c3 = $cleanings['booking:3:checkout'];
+        self::assertEquals($day(3, '11:00'), new \DateTimeImmutable($c3['scheduledAt']));
+        self::assertEquals($day(8, '15:00'), new \DateTimeImmutable($c3['dueAt']), 'due at the next check-in');
+        self::assertEquals($day(13, '11:00'), new \DateTimeImmutable($cleanings['booking:5:checkout']['dueAt']), 'no next stay: departure + 1 day');
+        self::assertSame('todo', $c3['status']);
+        self::assertStringContainsString('Sofia Rossi', $c3['label']);
+        self::assertContains('cleaning', array_column($timeline['events'], 'kind'));
+
+        // Idempotent: planning again creates nothing
+        $this->api('GET', "/api/properties/$port/timeline", null, $this->user);
+        self::assertCount(\count($cleanings), $this->cleanings(DemoPlace::PORT));
+
+        // Dates drifted (e.g. booking moved): the task still to do is moved back to the booking dates
+        $place = static::getContainer()->get(DemoPlace::class);
+        $place->handle('PATCH', '/api/cleanings/'.$c3['id'], ['scheduledAt' => $day(20, '10:00')->format(\DATE_ATOM), 'dueAt' => null], []);
+        $this->api('GET', "/api/properties/$port/bookings", null, $this->user);
+        $moved = $this->cleanings(DemoPlace::PORT)['booking:3:checkout'];
+        self::assertEquals($day(3, '11:00'), new \DateTimeImmutable($moved['scheduledAt']));
+        self::assertEquals($day(8, '15:00'), new \DateTimeImmutable($moved['dueAt']));
+
+        // A task already started is never touched
+        $place->handle('PATCH', '/api/cleanings/'.$c3['id'], ['status' => 'in_progress', 'scheduledAt' => $day(3, '12:00')->format(\DATE_ATOM)], []);
+        $this->api('GET', "/api/properties/$port/timeline", null, $this->user);
+        self::assertEquals($day(3, '12:00'), new \DateTimeImmutable($this->cleanings(DemoPlace::PORT)['booking:3:checkout']['scheduledAt']));
+    }
+
+    public function testCleaningOfACancelledBookingIsCancelled(): void
+    {
+        $place = static::getContainer()->get(DemoPlace::class);
+        // Booking 6 (Les vignes) is declined: a task left from before is cancelled at the next planning
+        $task = $place->handle('POST', '/api/places/'.DemoPlace::VIGNES.'/cleanings', ['scheduledAt' => (new \DateTimeImmutable('+1 day'))->format(\DATE_ATOM), 'externalRef' => 'booking:6:checkout'], []);
+        $vignes = $this->linked('Les vignes', DemoPlace::VIGNES);
+        $this->api('GET', "/api/properties/$vignes/timeline", null, $this->user);
+        $cleanings = $this->cleanings(DemoPlace::VIGNES);
+        self::assertSame('cancelled', $cleanings['booking:6:checkout']['status']);
+        self::assertSame($task['id'], $cleanings['booking:6:checkout']['id']);
+        self::assertSame('todo', $cleanings['booking:4:checkout']['status']);
+    }
+
+    public function testPropertyWithoutPlaceHasNoCleaning(): void
+    {
+        $this->api('POST', '/api/properties/sync', [], $this->admin);
+        $port = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name')['Le port'];
+        $timeline = $this->api('GET', "/api/properties/$port/timeline", null, $this->user);
+        $this->assertStatus(200);
+        self::assertNotContains('cleaning', array_column($timeline['events'], 'kind'));
+        self::assertSame([], $this->cleanings(DemoPlace::PORT));
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function cleanings(string $placeId): array
+    {
+        return array_column(static::getContainer()->get(DemoPlace::class)->handle('GET', "/api/places/$placeId/cleanings", null, []), null, 'externalRef');
+    }
+
+    private function linked(string $name, string $placeId): string
+    {
+        $this->api('POST', '/api/properties/sync', [], $this->admin);
+        $id = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name')[$name];
+        $this->api('PUT', "/api/properties/$id/place", ['placeId' => $placeId], $this->admin);
+        $this->assertStatus(200);
+
+        return $id;
+    }
+}
