@@ -4,6 +4,7 @@ parameters:
     env(PMS_TIMEZONE): 'Europe/Paris'
     env(ROCKET_PLACE_URL): ''
     env(ROCKET_PLACE_TOKEN): ''
+    env(ROCKET_PLACE_FRONT_URL): ''
     env(ROCKET_MAILER_URL): ''
     env(ROCKET_MAILER_TOKEN): ''
     env(ROCKET_MAILER_INBOX): ''

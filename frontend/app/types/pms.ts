@@ -267,3 +267,11 @@ export interface Bilan {
   items: Expense[]
   categoryOptions: CategoryOption[]
 }
+
+/** GET /api/place-links: link of each property with its Rocket Place place, and counts read from Place. */
+export type PlaceLinkStatus = 'linked' | 'unlinked' | 'missing' | 'unreachable'
+export interface PlaceLinkRow {
+  id: string, name: string, color: string, lodgifyPropertyId: number | null, placeId: string | null, placeName: string | null
+  status: PlaceLinkStatus, error: string | null, counts: { locks: number, upcomingGrants: number, openCleanings: number, lowStock: number } | null
+}
+export interface PlaceLinksOverview { demo: boolean, placeFrontUrl: string | null, error: string | null, places: { id: string, name: string }[], properties: PlaceLinkRow[] }

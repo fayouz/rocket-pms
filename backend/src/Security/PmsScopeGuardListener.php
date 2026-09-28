@@ -18,7 +18,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 #[AsDecorator(ScopeGuardListener::class)]
 final class PmsScopeGuardListener
 {
-    private const APPLICATION_PATTERN = '#^/api/(timeline|planning/run|properties(/[^/]+(/(bookings(/[^/]+/(pricing|conversation|guest-link(/send)?|emails(/[^/]+)?))?|welcome-book(/(stats|rotate))?|bilan(\.csv)?|expenses(/import)?|timeline|locks|codes|domotique|access-grants(/[^/]+/(send|revoke))?|documents(/.*)?|stock(/[^/]+)?|cleanings(/[^/]+/link)?))?)?)$#';
+    private const APPLICATION_PATTERN = '#^/api/(timeline|planning/run|place-links|properties(/[^/]+(/(bookings(/[^/]+/(pricing|conversation|guest-link(/send)?|emails(/[^/]+)?))?|welcome-book(/(stats|rotate))?|bilan(\.csv)?|expenses(/import)?|timeline|locks|codes|domotique|access-grants(/[^/]+/(send|revoke))?|documents(/.*)?|stock(/[^/]+)?|cleanings(/[^/]+/link)?))?)?)$#';
 
     public function __construct(
         #[AutowireDecorated] private readonly ScopeGuardListener $inner,
