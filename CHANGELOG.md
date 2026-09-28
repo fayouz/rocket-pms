@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.4.0] - 2026-09-28
 
 ### Modifié
 - **Secrets des intégrations dans le coffre de rocket-core** (0.3.1, Administration → Secrets) : `LODGIFY_API_KEY` → `lodgify.api_key`, `ROCKET_PLACE_TOKEN` → `rocket.place.token`, `ROCKET_CLEAN_TOKEN` → `rocket.clean.token`, `ROCKET_STOCK_TOKEN` → `rocket.stock.token`, `ROCKET_MAILER_TOKEN` → `rocket.mailer.token` ; **connecteurs Lodgify** : le champ `secret` contient le nom d'un secret du coffre choisi avec `SecretField` (au lieu d'une variable `CONNECTOR_*` ; les configs `secretVar` sont converties en `connector_x` par migration, repli sur la variable), jamais un secret propre à l'application ; adresses des briques (`ROCKET_*_URL`) inchangées dans l'environnement ; lus à l'exécution par `App\Secrets\IntegrationSecrets` / `App\Domotique\ConnectorSecrets`, jamais renvoyés par l'API. Repli temporaire sur l'ancienne variable (avertissement « deprecated »). Seule `ROCKET_SECRETS_KEY` (clé maîtresse) reste dans l'environnement.
