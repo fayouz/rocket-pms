@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.2.0] - 2026-09-28
 
 ### Modifié
 - **Rocket PMS devient un client de Rocket Place** : serrures et codes clavier (désormais des *accès* Rocket Place, prévus par séjour avec `externalRef` = identifiant de réservation, idempotents, envoyés à la serrure seulement sur clic), domotique, documents et stock sont gérés par Rocket Place et relayés par l'API de PMS (le navigateur ne parle qu'à PMS). Un logement se lie à son lieu (`placeId`) dans le nouvel onglet **Infos** (choix du lieu ou création depuis le logement) ; sans lieu, ces onglets répondent 409 avec un message clair. Nouvel onglet **Stock**. Variables `ROCKET_PLACE_URL` et `ROCKET_PLACE_TOKEN` (vides : Rocket Place de démo, sans réseau).
