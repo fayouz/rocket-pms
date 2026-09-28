@@ -1,13 +1,14 @@
 # Rocket PMS
 
-Gestion de locations courte durée (logements, réservations Lodgify, serrures Nuki), sur la stack des briques Rocket. Socle commun : [rocket-core](https://github.com/fayouz/rocket-core) (bundle Symfony `rocket/core-bundle` + layer Nuxt `@rocket/core`), à lire avant de modifier les comptes, le SSO, les applications, le tableau de bord ou la mise en page : ce code n'est pas ici. Issu de LoussaHousing (Nuxt + SQLite), qui deviendra un client de cette API.
+Gestion de locations courte durée (logements, réservations Lodgify), **application métier** Rocket (pas une brique de rocket-middlewares), cliente de **Rocket Place** (`../rocket-place`, serveur : ne pas le modifier depuis ici) pour tout le physique : serrures et accès, domotique, documents, stock. Socle commun : [rocket-core](https://github.com/fayouz/rocket-core) (bundle Symfony `rocket/core-bundle` + layer Nuxt `@rocket/core`), à lire avant de modifier les comptes, le SSO, les applications, le tableau de bord ou la mise en page : ce code n'est pas ici. Issu de LoussaHousing (Nuxt + SQLite), qui deviendra un client de cette API.
 
 ## Repères
 - `app_id` `pms`, jetons d'application `rpm_…`, ports front 3700 · api 8700 · docs 3701.
-- Domaine : `Property` (logement, lié à un logement Lodgify), `SmartLock` (serrure Nuki → logement), `AccessCode` (code clavier d'une réservation : prévu, créé, erreur). Les réservations, messages et devis ne sont **jamais stockés** : lus chez Lodgify (`Lodgify/LodgifyClient`, cache 5 min).
-- Intégrations : `Lodgify/LodgifyClient` (+ `DemoLodgify`), `Nuki/NukiClient` (+ `DemoNuki`), `Cloud/CloudClient` (+ `DemoCloud`) ; sans clé ou jeton : démo. Codes : `Code/AccessCodePlanner` (1 h avant l'arrivée / après le départ, fuseau `PMS_TIMEZONE`, jamais sur un séjour commencé, envoi à Nuki seulement sur action utilisateur). Timeline : `Timeline/TimelineBuilder`. Tableau de bord : `Dashboard/PropertiesSection`. Sondes : `Health/LodgifyProbe`, `Health/NukiProbe`, `Health/HomeyProbe`.
-- Domotique et connecteurs pluggables : `Domotique/PluginRegistry` (catalogue code-défini : `HomeyPlugin`, `WebServicePlugin`, `NukiPlugin`, `LodgifyPlugin`, `RocketCloudPlugin`), entité `Connector` (plugin configuré pour un logement, plusieurs par logement, capacités déclarées par le plugin). Chaque capacité a son registre qui résout le connecteur du logement puis retombe sur le compte global historique si absent : `Lock/LockProviderRegistry` (serrures), `Lodgify/BookingProviderRegistry` (réservations/prix/conversation, repli `LODGIFY_API_KEY`), `Cloud/DocumentProviderRegistry` (documents, repli `ROCKET_CLOUD_URL`/`ROCKET_CLOUD_TOKEN`). Secrets = uniquement un nom de variable `.env` préfixée `CONNECTOR_` (`Domotique/SecretEnv`), jamais la valeur en base. `Controller/ConnectorController` (CRUD admin + test), `Controller/DomotiqueController` (lecture par logement).
-- Front : `pages/properties/[id].vue` (onglets, dont « Domotique »), `components/BookingsInbox.vue`, `LocksInbox.vue`, `DomotiqueTab.vue`, `EventTimeline.vue` ; `pages/plugins.vue` (administration, catalogue) ; aides dans `utils/pms.ts`.
+- Domaine : `Property` (logement lié à un logement Lodgify et, via `placeId`, à un lieu Rocket Place). Les réservations, messages et devis ne sont **jamais stockés** : lus chez Lodgify (`Lodgify/LodgifyClient` + `DemoLodgify`, cache 5 min ; `Lodgify/BookingProviderRegistry` : connecteur Lodgify du logement, sinon `LODGIFY_API_KEY`).
+- Rocket Place : `Place/PlaceClient` (`ROCKET_PLACE_URL` + `ROCKET_PLACE_TOKEN` `rpl_…`, Bearer, réponses streamées plafonnées, erreurs 4xx relayées, 401/403/5xx/réseau → 502) ; vides : `Place/DemoPlace` (fichier `var/demo-place-<env>.json`, aucun réseau, `reset()` en test). `Controller/PlaceProxyController` relaie `/api/properties/{id}/locks|codes|access-grants|domotique|documents…|stock` vers `/api/places/{placeId}/…` (409 sans `placeId`) ; `Controller/PlaceLinkController` (admin) : `/api/places`, `PUT|POST /api/properties/{id}/place`, `/api/locks`.
+- Accès : `Code/AccessCodePlanner` calcule un accès par séjour à venir (1 h avant l'arrivée / après le départ, fuseau `PMS_TIMEZONE`) et le prévoit dans Place avec `externalRef` = id de réservation (idempotent, verrou Symfony ; dates changées avant envoi : révoqué puis re-prévu) ; envoi à la serrure uniquement sur clic (`POST …/access-grants/{grantId}/send`). Timeline : `Timeline/TimelineBuilder`. Tableau de bord : `Dashboard/PropertiesSection`. Sondes : `Health/LodgifyProbe`, `Health/PlaceProbe`.
+- Connecteurs PMS : seul `Domotique/LodgifyPlugin` (entité `Connector`, `Domotique/PluginRegistry`, secrets = nom de variable `.env` `CONNECTOR_…`, `Domotique/SecretEnv`) ; `Controller/ConnectorController`.
+- Front : `pages/properties/[id].vue` (onglets Réservations, Infos, Serrures, Domotique, Documents, Stock, Timeline), `components/PropertyInfoTab.vue` (lieu Place + connecteurs Lodgify), `BookingsInbox.vue`, `LocksInbox.vue`, `DomotiqueTab.vue`, `DocumentsTab.vue`, `StockTab.vue`, `EventTimeline.vue` ; `pages/locks.vue` (admin : serrure → lieu) ; aides dans `utils/pms.ts`.
 
 ## Vérifier avant de pousser
 ```bash
@@ -17,11 +18,12 @@ cd docs && npm run lint && npm run typecheck && npm run generate   # si docs/ a 
 ```
 
 ## Pièges connus
-- Envoi de messages aux voyageurs et création de codes sur les serrures : actions réelles chez Lodgify / Nuki, jamais en test ni sans clic de l'utilisateur.
-- Dates des codes en `DATETIMETZ` (instants justes quel que soit le fuseau du serveur).
+- Envoi de messages aux voyageurs et envoi de codes aux serrures : actions réelles chez Lodgify / Rocket Place, jamais en test ni sans clic de l'utilisateur.
+- Rocket Place donne au jeton d'application seul `ROLE_APPLICATION` (rocket-core) : ses routes `ROLE_USER`/`ROLE_ADMIN` doivent l'accepter côté Place, sinon PMS reçoit 403 (→ 502 « Rocket Place refuse… »).
+- Cache Symfony de test périmé après un changement d'entité : `php bin/console cache:clear --env=test`.
 - API Platform répond en JSON-LD par défaut : envoyer `Accept: application/json`.
 - Migrations : lancer d'abord celles du socle, puis `doctrine:migrations:diff`.
 - Pas de Composer sur le Mac de Faez : `docker run --rm -v "$PWD":/app -w /app composer:2 install --ignore-platform-reqs`. Cache npm global en erreur de droits : `npm ci --cache <dossier temporaire>`.
 
 ## Feuille de route
-v0.2 : documents par logement dans **Rocket Cloud** (dossier par logement, explorateur `@rocket/file-explorer`), ajout à rocket-suite avec Rocket Auth ; puis LoussaHousing client de l'API (jeton `rpm_…`), stock, livret d'accueil / écran TV, ménage, domotique, connecteurs.
+LoussaHousing client de l'API (jeton `rpm_…`), livret d'accueil / écran TV, ménage ; connexion unique via Rocket Auth (rocket-middlewares).

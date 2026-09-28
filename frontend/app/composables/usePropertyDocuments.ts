@@ -1,6 +1,6 @@
 import type { ExplorerAdapter, ExplorerItem } from '#file-explorer'
 
-/** A document (folder or file) of a property, proxied by the PMS API (never Rocket Cloud directly). */
+/** A document (folder or file) of a property, proxied by the PMS API to its place in Rocket Place. */
 export interface PmsDocument {
   id: string // "folder:<id>" or "file:<id>"
   kind: 'folder' | 'file'
@@ -14,8 +14,8 @@ export const PROPERTY_SPACE = 'property'
 
 /**
  * Adapter of @rocket/file-explorer on the "Documents" tab of a property: every call goes through our own API
- * (/api/properties/{id}/documents…), scoped by the backend to that property's Rocket Cloud folder, so the browser
- * never needs a Rocket Cloud account or token. Read-only for non-admins (the backend also enforces it).
+ * (/api/properties/{id}/documents…), forwarded by the backend to the property's place in Rocket Place, so the browser
+ * never needs a Rocket Place account or token. Read-only for non-admins (the backend also enforces it).
  */
 export function usePropertyDocuments(propertyId: string): ExplorerAdapter {
   const api = useApi()

@@ -8,13 +8,13 @@ useHead({ title: `Logements · ${useAppConfig().rocket.name}` })
 
 const { data: properties, refresh } = await useAsyncData('properties', () => api<Property[]>('/api/properties'), { default: () => [] })
 
-// Creates a property for every Lodgify property not linked yet, and registers the Nuki locks
+// Creates a property for every Lodgify property not linked yet
 const syncing = ref(false)
 async function sync() {
   syncing.value = true
   try {
-    const r = await api<{ created: number, locks: number }>('/api/properties/sync', { method: 'POST', body: {} })
-    toast.add({ title: 'Synchronisation terminée', description: `${r.created} logement(s) et ${r.locks} serrure(s) ajoutés.`, color: 'success' })
+    const r = await api<{ created: number }>('/api/properties/sync', { method: 'POST', body: {} })
+    toast.add({ title: 'Synchronisation terminée', description: `${r.created} logement(s) ajouté(s).`, color: 'success' })
     await refresh()
   }
   catch (error) {
@@ -44,7 +44,7 @@ async function setColor(property: Property, color: string) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton v-if="isAdmin" icon="i-lucide-refresh-cw" label="Synchroniser Lodgify et Nuki" color="neutral" variant="outline" :loading="syncing" @click="sync" />
+          <UButton v-if="isAdmin" icon="i-lucide-refresh-cw" label="Synchroniser Lodgify" color="neutral" variant="outline" :loading="syncing" @click="sync" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -70,7 +70,7 @@ async function setColor(property: Property, color: string) {
         </UCard>
       </div>
       <UCard v-if="!properties.length">
-        <p class="text-sm text-muted">Aucun logement. {{ isAdmin ? '« Synchroniser Lodgify et Nuki » crée un logement pour chaque logement Lodgify.' : 'Un administrateur doit d’abord synchroniser Lodgify.' }}</p>
+        <p class="text-sm text-muted">Aucun logement. {{ isAdmin ? '« Synchroniser Lodgify » crée un logement pour chaque logement Lodgify.' : 'Un administrateur doit d’abord synchroniser Lodgify.' }}</p>
       </UCard>
     </template>
   </UDashboardPanel>

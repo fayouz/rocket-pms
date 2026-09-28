@@ -4,15 +4,18 @@ namespace App\Domotique;
 
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-/** Built-in plugin catalogue: code-defined, nothing external is executed. Add a plugin = add a class + register it here. */
+/**
+ * Built-in plugin catalogue of PMS: only Lodgify (the PMS's own booking integration). Every physical connector
+ * (Homey, Home Assistant, Nuki, web services, documents) now lives in Rocket Place, attached to a place.
+ */
 final class PluginRegistry
 {
     /** @var list<PluginInterface> */
     private array $plugins;
 
-    public function __construct(HomeyPlugin $homey, HomeAssistantPlugin $homeAssistant, NukiPlugin $nuki, LodgifyPlugin $lodgify, RocketCloudPlugin $rocketCloud, WebServicePlugin $webService)
+    public function __construct(LodgifyPlugin $lodgify)
     {
-        $this->plugins = [$homey, $homeAssistant, $nuki, $lodgify, $rocketCloud, $webService];
+        $this->plugins = [$lodgify];
     }
 
     /** @return list<PluginInterface> */

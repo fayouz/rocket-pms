@@ -3,8 +3,8 @@
 namespace App\Domotique;
 
 /**
- * A configured plugin (Connector) attached to a property. Read-only in v0.2: only "info" cards and a "test" action are
- * exposed (no command sent to a real device). See App\Entity\Connector and the built-in plugins (Homey, Service web).
+ * A configured plugin (Connector) attached to a property. In PMS only the Lodgify plugin remains (bookings); physical
+ * connectors live in Rocket Place. See App\Entity\Connector.
  */
 interface PluginInterface
 {
@@ -32,9 +32,7 @@ interface PluginInterface
     public function info(array $config): array;
 
     /**
-     * Capabilities this plugin can provide beyond the read-only info cards, e.g. 'locks.state' (list/read smart
-     * locks) and 'locks.codes' (write a temporary keypad/access code). Empty for a plugin that is purely informative.
-     * A plugin declaring 'locks.state' or 'locks.codes' must implement App\Lock\LockCapablePluginInterface.
+     * Capabilities this plugin provides beyond the info cards, e.g. 'bookings' (App\Lodgify\BookingCapablePluginInterface).
      *
      * @return list<string>
      */

@@ -3,12 +3,12 @@ import type { AccessCode, Lock } from '~/types/pms'
 
 type CodeItem = AccessCode & { guest: string, source: string, arrival: string, departure: string }
 // Locks of a property on the left; on the right the chosen lock: state and battery, keypad codes of the upcoming stays
-// ("Créer sur Nuki", always confirmed) and its latest events.
+// ("Envoyer à la serrure", always confirmed; access grants of Rocket Place) and its latest events.
 const props = defineProps<{ propertyId: string }>()
 const api = useApi()
 const toast = useToast()
 const { data: locks } = await useAsyncData(`locks-${props.propertyId}`, () => api<{ demo: boolean, locks: Lock[] }>(`/api/properties/${props.propertyId}/locks`).catch(() => null))
-const { data: codes, refresh: refreshCodes } = await useAsyncData(`codes-${props.propertyId}`, () => api<{ demo: boolean, items: CodeItem[] }>(`/api/properties/${props.propertyId}/codes`))
+const { data: codes, refresh: refreshCodes } = await useAsyncData(`codes-${props.propertyId}`, () => api<{ demo: boolean, items: CodeItem[] }>(`/api/properties/${props.propertyId}/codes`).catch(() => null))
 
 const selected = ref<number | null>(null)
 watchEffect(() => {
@@ -23,7 +23,7 @@ async function send(i: CodeItem) {
   if (!confirm(`Créer le code ${i.code} sur la serrure pour ${i.guest} (${dayFr(i.arrival)} → ${dayFr(i.departure)}) ?`)) return
   busy.value = i.bookingId
   try {
-    await api(`/api/codes/${i.bookingId}`, { method: 'POST' })
+    await api(`/api/properties/${props.propertyId}/access-grants/${i.grantId}/send`, { method: 'POST' })
   }
   catch (error) {
     toast.add({ title: 'Code non créé', description: apiErrorMessage(error), color: 'error' })
@@ -50,8 +50,8 @@ async function send(i: CodeItem) {
           <span v-if="l.batteryCritical || l.keypadBatteryCritical" class="text-error"> · ⚠</span>
         </p>
       </button>
-      <p v-if="!locks" class="text-sm text-muted">Nuki ne répond pas pour le moment.</p>
-      <p v-else-if="!locks.locks.length" class="text-sm text-muted">Aucune serrure liée à ce logement (Administration → Serrures Nuki).</p>
+      <p v-if="!locks" class="text-sm text-muted">Serrures indisponibles : lie ce logement à son lieu Rocket Place (onglet « Infos »), ou Rocket Place ne répond pas.</p>
+      <p v-else-if="!locks.locks.length" class="text-sm text-muted">Aucune serrure liée à ce logement (Administration → Serrures).</p>
     </div>
 
     <div v-if="current" class="grid min-w-0 flex-1 gap-4 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)]">
@@ -63,17 +63,17 @@ async function send(i: CodeItem) {
             <UBadge :color="current.batteryCritical ? 'error' : 'neutral'" variant="subtle" :icon="batteryIcon(current.battery)" :label="current.battery === null ? '?' : `${current.battery} %`" />
             <UBadge v-if="current.keypadBatteryCritical" color="error" variant="subtle" label="Pile clavier faible" />
           </div>
-          <p class="mt-1 text-sm text-muted">Codes clavier : chacun s’ouvre 1 h avant le check-in et se ferme 1 h après le check-out (horaires Lodgify). Rien n’est envoyé à Nuki avant ton clic.</p>
+          <p class="mt-1 text-sm text-muted">Codes clavier : chacun s’ouvre 1 h avant le check-in et se ferme 1 h après le check-out (horaires Lodgify). Les accès sont gérés par Rocket Place ; rien n’est envoyé à la serrure avant ton clic.</p>
         </template>
         <div v-for="i in codesOf(current.id)" :key="i.bookingId" class="rounded-md border border-default p-3" :class="{ 'border-l-4 border-l-error': i.status === 'error' || i.outdated }">
           <div class="flex justify-between gap-3"><b>{{ i.guest }}</b><PlatformBadge :source="i.source" /></div>
           <p class="text-sm text-muted">{{ dayFr(i.arrival) }} → {{ dayFr(i.departure) }}</p>
           <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span><span class="font-mono text-lg font-semibold tracking-widest">{{ i.code }}</span><span class="text-sm text-muted"> · {{ whenFr(i.validFrom) }} → {{ whenFr(i.validUntil) }}</span></span>
-            <UBadge v-if="i.status === 'created'" color="success" variant="subtle" label="Créé sur Nuki" />
-            <UButton v-else size="sm" icon="i-lucide-key-round" label="Créer sur Nuki" :loading="busy === i.bookingId" :disabled="codes?.demo" @click="send(i)" />
+            <UBadge v-if="i.status === 'created'" color="success" variant="subtle" label="Envoyé à la serrure" />
+            <UButton v-else size="sm" icon="i-lucide-key-round" label="Envoyer à la serrure" :loading="busy === i.bookingId" :disabled="codes?.demo" @click="send(i)" />
           </div>
-          <p v-if="i.outdated" class="text-sm text-warning">⚠ Dates modifiées depuis la création : à refaire à la main dans Nuki.</p>
+          <p v-if="i.outdated" class="text-sm text-warning">⚠ Dates modifiées depuis la création : à refaire à la main sur la serrure.</p>
           <p v-if="i.error && i.status === 'error'" class="text-sm text-error">⚠ {{ i.error }}</p>
         </div>
         <p v-if="!codesOf(current.id).length" class="text-sm text-muted">Aucune réservation à venir sur cette serrure.</p>
