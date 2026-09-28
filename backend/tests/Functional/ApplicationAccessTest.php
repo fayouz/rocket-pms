@@ -33,7 +33,9 @@ final class ApplicationAccessTest extends WebTestCase
 
         foreach (["/api/properties/$port/bookings", "/api/properties/$port/bookings/5/pricing", "/api/properties/$port/bookings/5/conversation",
             "/api/properties/$port/locks", "/api/properties/$port/codes", "/api/properties/$port/domotique", "/api/properties/$port/documents",
-            "/api/properties/$port/stock", '/api/timeline'] as $uri) {
+            "/api/properties/$port/stock", '/api/timeline', "/api/properties/$port/welcome-book",
+            "/api/properties/$port/welcome-book/stats", "/api/properties/$port/bilan", "/api/properties/$port/expenses",
+            "/api/properties/$port/bookings/5/guest-link"] as $uri) {
             $this->api('GET', $uri, null, $app);
             $this->assertStatus(200);
         }
