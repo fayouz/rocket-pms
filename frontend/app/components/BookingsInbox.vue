@@ -92,7 +92,7 @@ async function generateCode() {
   if (!b?.access || !confirm(`Créer le code ${b.access.code} sur la serrure pour ${b.guest} (${dayFr(b.arrival)} → ${dayFr(b.departure)}) ?`)) return
   generating.value = true
   try {
-    await api(`/api/codes/${b.id}`, { method: 'POST' })
+    await api(`${base.value}/access-grants/${b.access.grantId}/send`, { method: 'POST' })
     await refresh()
   }
   catch (error) {
@@ -209,7 +209,7 @@ async function generateCode() {
               <UBadge size="sm" :color="l.batteryCritical ? 'error' : 'neutral'" variant="subtle" :icon="batteryIcon(l.battery)" :label="l.battery === null ? '?' : `${l.battery} %`" />
               <UBadge v-if="l.keypadBatteryCritical" size="sm" color="error" variant="subtle" label="Pile clavier faible" />
             </div>
-            <p v-if="!locks" class="mt-2 text-xs text-muted">Nuki ne répond pas pour le moment.</p>
+            <p v-if="!locks" class="mt-2 text-xs text-muted">Serrures indisponibles (logement sans lieu Rocket Place, ou Rocket Place injoignable).</p>
             <p v-else-if="!locks.locks.length" class="mt-2 text-xs text-muted">Aucune serrure associée à ce logement.</p>
           </template>
           <div v-if="current.access" class="space-y-2">
@@ -217,11 +217,11 @@ async function generateCode() {
               <span class="font-mono text-2xl font-semibold tracking-widest">{{ current.access.code }}</span>
               <UBadge
                 :color="current.access.status === 'created' ? 'success' : current.access.status === 'error' ? 'error' : 'neutral'" variant="subtle"
-                :label="current.access.status === 'created' ? 'Créé sur Nuki' : current.access.status === 'error' ? 'Erreur' : 'Prévu'"
+                :label="current.access.status === 'created' ? 'Envoyé à la serrure' : current.access.status === 'error' ? 'Erreur' : 'Prévu'"
               />
             </div>
             <p class="text-xs text-muted">Valable du {{ whenFr(current.access.validFrom) }} au {{ whenFr(current.access.validUntil) }}</p>
-            <p v-if="current.access.outdated" class="text-xs text-warning">⚠ Dates modifiées depuis la création : à refaire à la main dans Nuki.</p>
+            <p v-if="current.access.outdated" class="text-xs text-warning">⚠ Dates modifiées depuis la création : à refaire à la main sur la serrure.</p>
             <p v-if="current.access.status === 'error' && current.access.error" class="text-xs text-error">⚠ {{ current.access.error }}</p>
             <template v-if="current.access.status !== 'created'">
               <UButton v-if="current.phase === 'next'" block icon="i-lucide-key-round" label="Générer sur la serrure" :loading="generating" @click="generateCode" />
