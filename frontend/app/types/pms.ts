@@ -164,6 +164,9 @@ export interface WelcomeBook {
   style: WelcomeStyle
   tvToken: string
   tvPath: string
+  /** Front of Rocket Cast (ROCKET_CAST_FRONT_URL), null when not configured. */
+  castFrontUrl?: string | null
+  propertyId?: string
   tvUrl: string
   updatedAt: string | null
 }

@@ -43,6 +43,9 @@ cd frontend && npm install && NUXT_PUBLIC_API_BASE=http://localhost:8700 npm run
 |---|---|
 | `LODGIFY_API_KEY` | Clé d'API Lodgify (réservations, messagerie, devis). Vide : démo. |
 | `ROCKET_PLACE_URL` · `ROCKET_PLACE_TOKEN` | Adresse de l'API Rocket Place et jeton d'application (`rpl_…`) de PMS. Vides : Rocket Place de démo, sans réseau. |
+| `ROCKET_CLEAN_URL` · `ROCKET_CLEAN_TOKEN` | Rocket Clean (ménages après départ, occupation) : API et jeton d'application `rcl_…`. Vides : ménages de démo. |
+| `ROCKET_STOCK_URL` · `ROCKET_STOCK_TOKEN` | Rocket Stock (stock des lieux) : API et jeton `rst_…`. Vides : stock de démo. |
+| `ROCKET_CAST_FRONT_URL` | Front de Rocket Cast (bouton de l'onglet Livret & TV), facultatif. |
 | `ROCKET_MAILER_URL` · `ROCKET_MAILER_TOKEN` · `ROCKET_MAILER_INBOX` · `ROCKET_MAILER_MAILBOX` | Rocket Mailer : API, jeton d'application `rma_…` (impersonation), boîte partagée des voyageurs, boîte d'envoi (facultative). Vides : Rocket Mailer de démo, sans réseau. |
 | `ROCKET_AUTH_URL`, `ROCKET_AUTH_INTERNAL_URL`, `ROCKET_AUTH_CLIENT_ID` (`rocket-pms`), `ROCKET_AUTH_CLIENT_SECRET`, `ROCKET_AUTH_ADMIN_GROUP`, `ROCKET_PUBLIC_URL`, `ROCKET_INTERNAL_URL` | Mode suite (voir ci-dessous). `ROCKET_AUTH_URL` vide : mode autonome, inchangé. |
 | `FRONTEND_URL` | Adresse publique du front : liens absolus du livret envoyés aux voyageurs. |
@@ -51,6 +54,8 @@ cd frontend && npm install && NUXT_PUBLIC_API_BASE=http://localhost:8700 npm run
 ## Mode suite (Rocket Auth)
 
 Avec `ROCKET_AUTH_URL`, Rocket PMS rejoint la suite Rocket (mécanisme de rocket-core) : connexion par Rocket Auth uniquement, sélecteur des applications et « Mon compte » dans le menu, déconnexion propagée (RP-initiated logout, back-channel logout sur `ROCKET_INTERNAL_URL`). Rocket Auth déclare le client `rocket-pms`.
+
+**PMS → Rocket Clean / Rocket Stock** : de même, audiences `rocket-clean` et `rocket-stock`, `ROCKET_CLEAN_TOKEN` / `ROCKET_STOCK_TOKEN` en repli.
 
 **PMS → Rocket Mailer** : de même, audience `rocket-mailer`, `ROCKET_MAILER_TOKEN` en repli (non vérifié contre un Rocket Mailer réel).
 

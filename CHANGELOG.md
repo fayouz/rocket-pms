@@ -5,6 +5,10 @@ Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https:/
 ## [Non publié]
 
 ### Ajouté
+- **Rocket Clean** : les ménages après départ sont créés dans Rocket Clean (`Clean/CleanClient`, `ROCKET_CLEAN_URL`/`ROCKET_CLEAN_TOKEN`, audience suite `rocket-clean`, démo sans réseau) avec `type: rental` et `origin: pms` ; la planification y pousse aussi l'occupation du lieu (séjours, `externalRef` `booking:<id>`). Timeline, `/api/properties/{id}/cleanings` et `/link`, compteur « ménages ouverts » des Liaisons lisent Rocket Clean.
+- **Rocket Stock** : onglet Stock et compteur « stock bas » lus et écrits dans Rocket Stock (`Stock/StockClient`, `ROCKET_STOCK_URL`/`ROCKET_STOCK_TOKEN`, audience `rocket-stock`, démo sans réseau) ; plus de stock via Rocket Place.
+- **Rocket Cast** : `GET /api/cast/properties/{id}` (jeton d'application, lecture) = charge utile de l'écran TV + arrivées et départs du jour + `version` ; bouton « Afficher sur un écran Rocket Cast » (`ROCKET_CAST_FRONT_URL`). La page `/tv` est conservée.
+- Clients des briques factorisés (`Rocket/BrickClient`).
 - **Planification** des codes et ménages : tâche récurrente rocket-core toutes les 15 minutes (`App\Planning\PlanningSchedule`, message `RunPlanning`) et `POST /api/planning/run` (PMS_MANAGE, ouvert aux applications) ; bouton « Lancer la planification » (administrateur) sur la page Timeline.
 - **Lien ménage** : `GET /api/properties/{id}/cleanings` et `GET /api/properties/{id}/cleanings/{cleaningId}/link` (PMS_MANAGE, ouverts aux applications), `PlaceClient::cleaningLink`, Rocket Place de démo étendu ; « Copier le lien ménage » dans les ménages de la timeline.
 - **Liaisons Place** (Administration) : chaque logement avec son id Lodgify, son lieu Rocket Place (lien vers le front Place si `ROCKET_PLACE_FRONT_URL`), l'état de la liaison (lié, non lié, lieu introuvable, Place injoignable), serrures, accès à venir, ménages ouverts, stock bas ; lier, changer, délier, créer le lieu depuis le logement. `GET /api/place-links` (PMS_MANAGE, ouvert aux applications).

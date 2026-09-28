@@ -9,7 +9,8 @@ use Symfony\Component\Uid\Uuid;
  * Rocket Place used whenever ROCKET_PLACE_URL / ROCKET_PLACE_TOKEN are not configured: a tiny in-process imitation of
  * the endpoints PMS uses (same paths, same JSON shapes), so the app and its functional tests stay fully offline.
  * State is kept in a small JSON file (var/demo-place-<env>.json) since, like a real HTTP call, it must survive across
- * requests (cleanings included, find-or-create by externalRef as the real API). Two demo places ("Le port", "Les vignes") each with one fictitious lock; nothing is ever sent to a lock.
+ * requests (cleanings included, find-or-create by externalRef as the real API). Also backs App\Clean\DemoClean (cleanings,
+ * occupancy) and App\Stock\DemoStock (stock), so the demo stays consistent. Two demo places ("Le port", "Les vignes") each with one fictitious lock; nothing is ever sent to a lock.
  */
 final class DemoPlace
 {
@@ -59,6 +60,8 @@ final class DemoPlace
             $route('POST', "/api/places/$uuid/cleanings") => $this->createCleaning($s, $m[1], $json),
             $route('PATCH', "/api/cleanings/$uuid") => $this->patchCleaning($s, $m[1], $json),
             $route('GET', "/api/cleanings/$uuid/link") => $this->cleaningLink($s, $m[1]),
+            $route('GET', "/api/places/$uuid/occupancy") => array_values($s['occupancy'][$m[1]] ?? []),
+            $route('PUT', "/api/places/$uuid/occupancy") => $s['occupancy'][$m[1]] = array_values(array_map(static fn ($p) => ['from' => (string) ($p['from'] ?? ''), 'until' => (string) ($p['until'] ?? ''), 'externalRef' => $p['externalRef'] ?? null], array_filter($json, 'is_array'))),
             $route('GET', "/api/places/$uuid/domotique") => $this->domotique($s, $m[1]),
             $route('GET', "/api/places/$uuid/documents") => $this->documents($s, $m[1], (string) ($query['folder'] ?? '')),
             $route('POST', "/api/places/$uuid/documents/folders") => $this->addDocument($s, $m[1], 'folder', (string) ($json['name'] ?? ''), null, $json['folder'] ?? null),
@@ -216,6 +219,7 @@ final class DemoPlace
             'id' => $id, 'placeId' => $place['id'], 'placeName' => $place['name'], 'label' => mb_substr(trim((string) ($json['label'] ?? '')) ?: 'Ménage', 0, 120),
             'scheduledAt' => $at->format(\DATE_ATOM), 'dueAt' => $due?->format(\DATE_ATOM), 'status' => 'todo', 'late' => false,
             'assignee' => null === ($json['assigneeEmail'] ?? null) ? null : ['id' => null, 'email' => (string) $json['assigneeEmail'], 'name' => (string) $json['assigneeEmail']],
+            'type' => (string) ($json['type'] ?? (null !== $ref && str_starts_with($ref, 'booking:') ? 'rental' : 'personal')), 'origin' => $json['origin'] ?? null,
             'externalRef' => $ref, 'notes' => null === ($json['notes'] ?? null) ? null : (string) $json['notes'],
             'checklist' => [], 'photos' => [], 'stockReports' => [], 'startedAt' => null, 'completedAt' => null,
         ];

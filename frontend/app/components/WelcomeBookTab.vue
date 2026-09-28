@@ -158,7 +158,9 @@ const guestOf = (bookingId: number | null) => bookingId === null ? 'Écran TV' :
           <UButton icon="i-lucide-qr-code" variant="soft" label="QR code" @click="showQr('Écran TV', origin + book.tvPath)" />
           <UButton icon="i-lucide-external-link" variant="ghost" label="Ouvrir" :to="book.tvPath" target="_blank" />
           <UButton v-if="isAdmin" icon="i-lucide-refresh-cw" variant="ghost" color="warning" label="Régénérer" @click="rotate('tv')" />
+          <UButton v-if="book.castFrontUrl" icon="i-lucide-cast" variant="ghost" label="Afficher sur un écran Rocket Cast" :to="book.castFrontUrl" target="_blank" external />
         </div>
+        <p v-if="book?.castFrontUrl" class="mt-2 text-xs text-muted">Dans Rocket Cast, ajoute une source « Rocket PMS » et choisis ce logement ({{ book.propertyId }}).</p>
       </UCard>
 
       <UCard>

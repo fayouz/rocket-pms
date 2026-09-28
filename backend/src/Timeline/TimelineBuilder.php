@@ -10,7 +10,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Read-only timeline of a property (planning codes and cleanings is App\Planning\PlanningRunner's job, never a read): arrivals and departures, keypad code opening and expiry (access grants of Rocket Place),
- * the cleanings after each departure (Rocket Place cleaning tasks planned by PMS), and the last events of the locks of its place, between $past days ago and $future days ahead, sorted by date.
+ * the cleanings after each departure (Rocket Clean cleanings planned by PMS), and the last events of the locks of its place, between $past days ago and $future days ahead, sorted by date.
  */
 final class TimelineBuilder
 {
@@ -39,7 +39,7 @@ final class TimelineBuilder
         try {
             $cleanings = null === $property->getPlaceId() ? [] : $this->cleaningPlanner->cleanings($property->getPlaceId());
         } catch (HttpException) {
-            $cleanings = []; // Rocket Place without cleanings
+            $cleanings = []; // Rocket Clean unreachable
         }
         foreach ($this->planner->bookingsOf($property) as $b) {
             if (!$b->isActive()) {
