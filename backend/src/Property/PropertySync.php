@@ -3,33 +3,30 @@
 namespace App\Property;
 
 use App\Entity\Property;
-use App\Entity\SmartLock;
-use App\Lodgify\LodgifyClient;
-use App\Nuki\NukiClient;
+use App\Lodgify\BookingProviderRegistry;
 use App\Repository\PropertyRepository;
-use App\Repository\SmartLockRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Creates a property for every Lodgify property not linked yet (named after its short "internal name"), refreshes the
- * Lodgify name and coordinates, and registers every Nuki lock (the link lock → property is chosen by an admin).
+ * Creates a property for every Lodgify property not linked yet (named after its short "internal name") and refreshes
+ * the Lodgify name and coordinates. Locks are no longer synced here: they belong to Rocket Place (link a property to
+ * its place, see App\Controller\PlaceLinkController). Always uses the legacy, global LODGIFY_API_KEY account
+ * (App\Lodgify\BookingProviderRegistry::legacy), since it runs before any property (and so any connector) exists.
  */
 final class PropertySync
 {
     public function __construct(
-        private readonly LodgifyClient $lodgify,
-        private readonly NukiClient $nuki,
+        private readonly BookingProviderRegistry $bookingProviders,
         private readonly PropertyRepository $properties,
-        private readonly SmartLockRepository $locks,
         private readonly EntityManagerInterface $em,
     ) {
     }
 
-    /** @return array{created: int, locks: int} */
+    /** @return array{created: int} */
     public function sync(): array
     {
         $created = 0;
-        foreach ($this->lodgify->properties() as $p) {
+        foreach ($this->bookingProviders->legacy()->properties() as $p) {
             $property = $this->properties->findOneBy(['lodgifyPropertyId' => $p['id']]);
             if (null === $property) {
                 $property = (new Property())->setName($p['internalName'] ?? $p['name'])->setLodgifyPropertyId($p['id']);
@@ -38,17 +35,8 @@ final class PropertySync
             }
             $property->setLodgifyName($p['name'])->setCoordinates($p['latitude'], $p['longitude']);
         }
-        $newLocks = 0;
-        foreach ($this->nuki->locks() as $l) {
-            $lock = $this->locks->find($l['id']);
-            if (null === $lock) {
-                $this->em->persist($lock = new SmartLock($l['id']));
-                ++$newLocks;
-            }
-            $lock->setName($l['name']);
-        }
         $this->em->flush();
 
-        return ['created' => $created, 'locks' => $newLocks];
+        return ['created' => $created];
     }
 }

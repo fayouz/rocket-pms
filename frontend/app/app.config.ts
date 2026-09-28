@@ -14,7 +14,7 @@ export default defineAppConfig({
     name: 'Rocket PMS',
     icon: 'i-lucide-building-2',
     // Login page subtitle.
-    tagline: 'La gestion de tes locations courte durée : logements, réservations Lodgify, voyageurs, serrures connectées.',
+    tagline: 'La gestion de tes locations courte durée : logements, réservations Lodgify, voyageurs ; serrures, domotique, documents et stock via Rocket Place.',
     // Main menu: the domain pages ("label" entries start a group).
     navigation: [
       { label: 'Logements', type: 'label' },
@@ -23,7 +23,7 @@ export default defineAppConfig({
     ] as { label: string, icon?: string, to?: string, type?: 'label', exact?: boolean, exactQuery?: boolean, admin?: boolean }[],
     // Extra entries of the Administration menu.
     adminNavigation: [
-      { label: 'Serrures Nuki', icon: 'i-lucide-lock', to: '/locks' },
+      { label: 'Serrures', icon: 'i-lucide-lock', to: '/locks' },
     ] as { label: string, icon: string, to: string, exactQuery?: boolean }[],
     // "Services & raccourcis" of the dashboard, besides the documentation, changelog and API.
     shortcuts: [] as { label: string, description: string, icon: string, to: string, admin?: boolean }[],

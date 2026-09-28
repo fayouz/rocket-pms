@@ -2,12 +2,14 @@
 
 namespace App\Tests\Functional;
 
+use App\Place\DemoPlace;
 use App\Tests\ApiTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * The property core in demo mode (no Lodgify or Nuki key): sync, bookings with their value and conversation, locks and
- * keypad codes, timeline, dashboard, and who may do what.
+ * The property core in demo mode (no Lodgify key, no Rocket Place URL: App\Place\DemoPlace answers offline): sync,
+ * bookings with their value and conversation, locks and keypad codes (access grants of Rocket Place), timeline,
+ * dashboard, and who may do what.
  */
 final class PropertyTest extends WebTestCase
 {
@@ -19,6 +21,7 @@ final class PropertyTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
+        static::getContainer()->get(DemoPlace::class)->reset();
         $this->admin = 'Bearer '.$this->jwtFor($this->createUser('admin@example.org', ['ROLE_ADMIN']));
         $this->user = 'Bearer '.$this->jwtFor($this->createUser('alice@example.org'));
     }
@@ -30,8 +33,8 @@ final class PropertyTest extends WebTestCase
         $this->api('POST', '/api/properties/sync', [], $this->user);
         $this->assertStatus(403);
 
-        self::assertSame(['created' => 2, 'locks' => 2], $this->api('POST', '/api/properties/sync', [], $this->admin));
-        self::assertSame(['created' => 0, 'locks' => 0], $this->api('POST', '/api/properties/sync', [], $this->admin));
+        self::assertSame(['created' => 2], $this->api('POST', '/api/properties/sync', [], $this->admin));
+        self::assertSame(['created' => 0], $this->api('POST', '/api/properties/sync', [], $this->admin));
         $properties = $this->api('GET', '/api/properties', null, $this->user);
         self::assertSame(['Le port', 'Les vignes'], array_column($properties, 'name'));
 
@@ -85,16 +88,16 @@ final class PropertyTest extends WebTestCase
         self::assertSame('14:00', (new \DateTimeImmutable($codes[0]['validFrom']))->setTimezone(new \DateTimeZone('Europe/Paris'))->format('H:i'));
         self::assertSame('12:00', (new \DateTimeImmutable($codes[0]['validUntil']))->setTimezone(new \DateTimeZone('Europe/Paris'))->format('H:i'));
 
-        // Nothing is sent to Nuki in demo mode; a started stay is never touched
-        $this->api('POST', '/api/codes/5', null, $this->user);
+        // Nothing is sent to a lock in demo mode; an unknown grant is refused
+        $this->api('POST', "/api/properties/$port/access-grants/{$codes[0]['grantId']}/send", null, $this->user);
         $this->assertStatus(400);
-        $this->api('POST', '/api/codes/3', null, $this->user);
+        $this->api('POST', "/api/properties/$port/access-grants/0192f7c4-7f38-7d3a-9a8c-3b2a1f0e9d8c/send", null, $this->user);
         $this->assertStatus(404);
 
-        // Only an admin links a lock to a property
-        $this->api('PUT', '/api/locks/90001', ['property' => null], $this->user);
+        // Only an admin links a lock to a place
+        $this->api('PUT', '/api/locks/90001', ['place' => null], $this->user);
         $this->assertStatus(403);
-        $this->api('PUT', '/api/locks/90001', ['property' => null], $this->admin);
+        $this->api('PUT', '/api/locks/90001', ['place' => null], $this->admin);
         $this->assertStatus(200);
         self::assertSame([], $this->api('GET', "/api/properties/$port/locks", null, $this->user)['locks']);
     }
@@ -115,13 +118,35 @@ final class PropertyTest extends WebTestCase
         self::assertArrayHasKey('occupancy', $kpis);
     }
 
-    /** Demo properties and locks, as the demo seeder does; returns the id of "Le port". */
+    /**
+     * A "lodgify" connector on the property is picked over the legacy LODGIFY_API_KEY fallback
+     * (App\Lodgify\BookingProviderRegistry): here it points at a CONNECTOR_ variable that is not set in .env, so the
+     * bookings endpoint fails instead of silently falling back to the demo/global account — proof that the
+     * connector, not the legacy client, was resolved. No network call is made (App\Domotique\SecretEnv fails first).
+     */
+    public function testAPropertyConnectorIsPreferredOverTheLegacyLodgifyAccount(): void
+    {
+        $port = $this->seed();
+        self::assertTrue($this->api('GET', "/api/properties/$port/bookings", null, $this->user)['demo'], 'no connector yet: legacy/demo client answers');
+
+        $connector = $this->api('POST', "/api/properties/$port/connectors", ['pluginId' => 'lodgify', 'config' => ['secretVar' => 'CONNECTOR_LODGIFY_TEST']], $this->admin);
+        $this->assertStatus(201);
+
+        $this->api('GET', "/api/properties/$port/bookings", null, $this->user);
+        $this->assertStatus(400, 'the property own connector is used, and its secret is not configured');
+
+        // Disabling the connector restores the legacy/demo fallback.
+        $this->api('PATCH', "/api/connectors/{$connector['id']}", ['enabled' => false], $this->admin);
+        self::assertTrue($this->api('GET', "/api/properties/$port/bookings", null, $this->user)['demo']);
+    }
+
+    /** Demo properties linked to their demo place (each with its lock), as the demo seeder does; returns the id of "Le port". */
     private function seed(): string
     {
         $this->api('POST', '/api/properties/sync', [], $this->admin);
         $properties = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name');
-        $this->api('PUT', '/api/locks/90001', ['property' => $properties['Le port']], $this->admin);
-        $this->api('PUT', '/api/locks/90002', ['property' => $properties['Les vignes']], $this->admin);
+        $this->api('PUT', "/api/properties/{$properties['Le port']}/place", ['placeId' => DemoPlace::PORT], $this->admin);
+        $this->api('PUT', "/api/properties/{$properties['Les vignes']}/place", ['placeId' => DemoPlace::VIGNES], $this->admin);
 
         return $properties['Le port'];
     }

@@ -17,7 +17,9 @@ final class DemoLodgify
     /** @return list<Booking> */
     public static function bookings(): array
     {
-        $d = static fn (int $n) => (new \DateTimeImmutable('today'))->modify(($n >= 0 ? '+' : '').$n.' days')->format('Y-m-d');
+        // "Today" in the PMS time zone, as the dashboard and the planner count it (not the PHP default, often UTC)
+        $tz = new \DateTimeZone($_SERVER['PMS_TIMEZONE'] ?? $_ENV['PMS_TIMEZONE'] ?? date_default_timezone_get());
+        $d = static fn (int $n) => (new \DateTimeImmutable('today', $tz))->modify(($n >= 0 ? '+' : '').$n.' days')->format('Y-m-d');
 
         return [
             new Booking(1, 1001, $d(-3), $d(0), 'Alex Martin', 'Booked', 'AirbnbIntegration', 210, 'demo-1', null, '15:00', '11:00'),

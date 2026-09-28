@@ -2,22 +2,23 @@
 
 namespace App\Code;
 
-use App\Entity\AccessCode;
-use App\Entity\SmartLock;
+use App\Entity\Property;
 use App\Lodgify\Booking;
-use App\Lodgify\LodgifyClient;
-use App\Nuki\NukiClient;
-use App\Repository\AccessCodeRepository;
-use App\Repository\SmartLockRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Lodgify\BookingProviderRegistry;
+use App\Place\PlaceClient;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * Keypad codes: planned in the database for every upcoming stay of a property that has a lock, then sent to Nuki only
- * on a user's click. The code opens 1 h before check-in and closes 1 h after check-out (local time of the properties).
- * A stay that has started is never touched again.
+ * Keypad access of the stays, delegated to Rocket Place. PMS only computes which access grants are needed: one per
+ * upcoming active booking of a property linked to a place with a lock, opening 1 h before check-in and closing 1 h
+ * after check-out (local time, PMS_TIMEZONE). Each grant is planned in Rocket Place with externalRef = booking id, so
+ * planning is idempotent (an existing grant for that booking is reused). A planned grant whose booking dates changed
+ * is revoked and re-planned; a grant already sent to the lock is never touched (flagged "outdated").
+ * Sending the code to the lock stays an explicit user click (::send), never implicit. A stay that has started is
+ * never touched again.
  */
 final class AccessCodePlanner
 {
@@ -26,18 +27,16 @@ final class AccessCodePlanner
     private const MARGIN = 'PT1H';
 
     public function __construct(
-        private readonly LodgifyClient $lodgify,
-        private readonly NukiClient $nuki,
-        private readonly SmartLockRepository $locks,
-        private readonly AccessCodeRepository $codes,
-        private readonly EntityManagerInterface $em,
+        private readonly BookingProviderRegistry $bookingProviders,
+        private readonly PlaceClient $place,
+        private readonly LockFactory $lockFactory,
         private readonly ClockInterface $clock,
         private readonly TranslatorInterface $translator,
         private readonly string $timezone,
     ) {
     }
 
-    /** Opening and closing of the code of a booking. @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable} */
+    /** Opening and closing of the access of a booking. @return array{0: \DateTimeImmutable, 1: \DateTimeImmutable} */
     public function validity(Booking $b): array
     {
         $tz = new \DateTimeZone($this->timezone);
@@ -47,64 +46,73 @@ final class AccessCodePlanner
         return [$from->sub(new \DateInterval(self::MARGIN)), $until->add(new \DateInterval(self::MARGIN))];
     }
 
-    /** Plans (or re-dates, while not sent) the codes of all upcoming active stays whose property has a lock. */
-    public function plan(): void
+    /**
+     * Plans the missing grants of the upcoming stays of the property, then returns the live (not revoked) grants of
+     * its place, indexed by externalRef (booking id). Empty when the property has no place.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function plan(Property $property): array
     {
-        $today = $this->today();
-        $lockByLodgify = [];
-        foreach ($this->locks->findAll() as $lock) {
-            $id = $lock->getProperty()?->getLodgifyPropertyId();
-            if (null !== $id && !isset($lockByLodgify[$id])) {
-                $lockByLodgify[$id] = $lock;
-            }
+        $placeId = $property->getPlaceId();
+        if (null === $placeId) {
+            return [];
         }
-        foreach ($this->lodgify->bookings() as $b) {
-            $lock = $lockByLodgify[$b->propertyId] ?? null;
-            if (null === $lock || !$b->isActive() || $b->arrival <= $today) {
-                continue;
+        $lock = $this->lockFactory->createLock('pms-access-plan-'.$placeId, 30);
+        $lock->acquire(true);
+        try {
+            $grants = $this->grants($placeId);
+            $lockId = null;
+            $changed = false;
+            foreach ($this->upcoming($property) as $b) {
+                [$from, $until] = $this->validity($b);
+                $existing = $grants[(string) $b->id] ?? null;
+                if (null !== $existing && ('created' === $existing['status'] || !$this->differs($existing, $from, $until))) {
+                    continue;
+                }
+                $lockId ??= $this->firstLockId($placeId);
+                if (null === $lockId) {
+                    break; // no lock on the place: nothing to plan
+                }
+                if (null !== $existing) {
+                    $this->place->request('POST', '/api/access-grants/'.$existing['id'].'/revoke');
+                }
+                $this->place->request('POST', '/api/places/'.$placeId.'/access-grants', [
+                    'lockId' => $lockId, 'label' => mb_substr('LH-'.$b->id.' '.$b->guest, 0, 120),
+                    'validFrom' => $from->format(\DATE_ATOM), 'validUntil' => $until->format(\DATE_ATOM), 'externalRef' => (string) $b->id,
+                ]);
+                $changed = true;
             }
-            [$from, $until] = $this->validity($b);
-            $code = $this->codes->find($b->id);
-            if (null === $code) {
-                $this->em->persist(new AccessCode($b->id, $lock, $this->newCode($lock), $from, $until));
-            } elseif (AccessCode::CREATED !== $code->getStatus() && ($code->getValidFrom() != $from || $code->getValidUntil() != $until)) {
-                $code->setValidity($from, $until);
-            }
+
+            return $changed ? $this->grants($placeId) : $grants;
+        } finally {
+            $lock->release();
         }
-        $this->em->flush();
     }
 
-    /** A code sent to Nuki whose booking dates changed since: it must be redone by hand in Nuki. */
-    public function isOutdated(AccessCode $code, Booking $b): bool
+    /** A grant sent to the lock whose booking dates changed since: it must be redone by hand. @param array<string, mixed> $grant */
+    public function isOutdated(array $grant, Booking $b): bool
     {
         [$from, $until] = $this->validity($b);
 
-        return AccessCode::CREATED === $code->getStatus() && ($code->getValidFrom() != $from || $code->getValidUntil() != $until);
+        return 'created' === $grant['status'] && $this->differs($grant, $from, $until);
     }
 
-    /** Writes the code to the Nuki lock (explicit user action). */
-    public function send(int $bookingId): AccessCode
+    /** Writes the code of a grant of this property to the lock (explicit user action). @return array<string, mixed> */
+    public function send(Property $property, string $grantId): array
     {
-        $this->plan();
-        $code = $this->codes->find($bookingId) ?? throw new HttpException(404, $this->translator->trans('booking.unknown'));
-        if (AccessCode::CREATED === $code->getStatus()) {
+        $placeId = PlaceClient::placeIdOf($property);
+        $grant = current(array_filter($this->grants($placeId), static fn (array $g) => $g['id'] === $grantId))
+            ?: throw new HttpException(404, $this->translator->trans('booking.unknown'));
+        if ('created' === $grant['status']) {
             throw new HttpException(409, $this->translator->trans('code.already_created'));
         }
-        $b = $this->lodgify->booking($bookingId);
+        $b = null === $grant['externalRef'] || !ctype_digit((string) $grant['externalRef']) ? null : $this->bookingProviders->providerFor($property)->booking((int) $grant['externalRef']);
         if (null === $b || $b->arrival <= $this->today()) {
             throw new HttpException(409, $this->translator->trans('code.started'));
         }
-        try {
-            $this->nuki->createKeypadCode($code->getLock()->getNukiId(), 'LH-'.$bookingId.' '.$b->guest, $code->getCode(), $code->getValidFrom(), $code->getValidUntil());
-        } catch (HttpException $e) {
-            $code->markError($e->getMessage());
-            $this->em->flush();
-            throw $e;
-        }
-        $code->markCreated($this->clock->now());
-        $this->em->flush();
 
-        return $code;
+        return $this->place->request('POST', '/api/access-grants/'.$grantId.'/send');
     }
 
     public function today(): string
@@ -112,17 +120,47 @@ final class AccessCodePlanner
         return $this->clock->now()->setTimezone(new \DateTimeZone($this->timezone))->format('Y-m-d');
     }
 
-    /** 6 digits without 0, not starting with 12 (Nuki keypad rules), unique on the lock. */
-    private function newCode(SmartLock $lock): string
+    /** @return array<string, array<string, mixed>> live grants of the place indexed by externalRef */
+    private function grants(string $placeId): array
     {
-        $taken = array_map(static fn (AccessCode $c) => $c->getCode(), $this->codes->findBy(['lock' => $lock]));
-        do {
-            $code = '';
-            for ($i = 0; $i < 6; ++$i) {
-                $code .= (string) random_int(1, 9);
+        $out = [];
+        foreach ($this->place->request('GET', '/api/places/'.$placeId.'/access-grants') as $g) {
+            if (\is_array($g) && 'revoked' !== ($g['status'] ?? '') && null !== ($g['externalRef'] ?? null)) {
+                $out[(string) $g['externalRef']] = $g;
             }
-        } while (str_starts_with($code, '12') || \in_array($code, $taken, true));
+        }
 
-        return $code;
+        return $out;
+    }
+
+    /** Bookings of the property (its own Lodgify connector, or the legacy account). @return list<Booking> */
+    public function bookingsOf(Property $property): array
+    {
+        if (null === $property->getLodgifyPropertyId()) {
+            return [];
+        }
+
+        return array_values(array_filter($this->bookingProviders->providerFor($property)->bookings(), static fn (Booking $b) => $b->propertyId === $property->getLodgifyPropertyId()));
+    }
+
+    /** @return list<Booking> */
+    private function upcoming(Property $property): array
+    {
+        $today = $this->today();
+
+        return array_values(array_filter($this->bookingsOf($property), static fn (Booking $b) => $b->isActive() && $b->arrival > $today));
+    }
+
+    private function firstLockId(string $placeId): ?int
+    {
+        $locks = $this->place->request('GET', '/api/places/'.$placeId.'/locks')['locks'] ?? [];
+
+        return isset($locks[0]['id']) ? (int) $locks[0]['id'] : null;
+    }
+
+    /** @param array<string, mixed> $grant */
+    private function differs(array $grant, \DateTimeImmutable $from, \DateTimeImmutable $until): bool
+    {
+        return new \DateTimeImmutable((string) $grant['validFrom']) != $from || new \DateTimeImmutable((string) $grant['validUntil']) != $until;
     }
 }

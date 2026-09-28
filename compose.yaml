@@ -13,9 +13,11 @@ x-api-env: &api-env
   SETUP_TOKEN: ${SETUP_TOKEN:-}
   # Encrypts the secrets stored in the database (empty: derived from APP_SECRET).
   SECRETS_ENCRYPTION_KEY: ${SECRETS_ENCRYPTION_KEY:-}
-  # Lodgify (bookings, messaging) and Nuki (smart locks). Empty: demo data.
+  # Lodgify (bookings, messaging). Empty: demo data.
   LODGIFY_API_KEY: ${LODGIFY_API_KEY:-}
-  NUKI_API_TOKEN: ${NUKI_API_TOKEN:-}
+  # Rocket Place (locks and access grants, domotique, documents, stock of each place). Empty: demo places.
+  ROCKET_PLACE_URL: ${ROCKET_PLACE_URL:-}
+  ROCKET_PLACE_TOKEN: ${ROCKET_PLACE_TOKEN:-}
   PMS_TIMEZONE: ${PMS_TIMEZONE:-Europe/Paris}
   # Suite mode: sign-in through Rocket Auth (see rocket-core). Empty ROCKET_AUTH_URL: standalone.
   ROCKET_AUTH_URL: ${ROCKET_AUTH_URL:-}
