@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Booking, BookingEmails, Lock, Message, Pricing } from '~/types/pms'
+import type { Booking, BookingEmails, GuestLink, Lock, Message, Pricing, WelcomeLanguage } from '~/types/pms'
 
 // Bookings of a property, like a mail client: compact list on the left (search, filter, sort), detail on the right
 // (conversation with the guest and reply 2/3; value of the stay and smart lock 1/3). The composer writes either a
@@ -45,6 +45,50 @@ const subject = ref('')
 const draft = ref('')
 const draftId = ref(crypto.randomUUID())
 const sending = ref(false)
+
+// Sending the welcome-book link to the guest: prepared in a window, sent only on "Envoyer" + confirmation
+const linkOpen = ref(false)
+const linkChannel = ref<'lodgify' | 'email'>('lodgify')
+const linkLang = ref<WelcomeLanguage>('fr')
+const linkText = ref('')
+const linkUrl = ref('')
+const linkId = ref('')
+const linkSending = ref(false)
+async function openLink() {
+  if (!current.value) return
+  try {
+    const link = await api<GuestLink>(`${base.value}/bookings/${current.value.id}/guest-link`)
+    linkUrl.value = link.url
+    linkText.value = link.message
+    linkChannel.value = current.value.guestEmail ? 'email' : 'lodgify'
+    linkId.value = crypto.randomUUID()
+    linkOpen.value = true
+  }
+  catch (e) {
+    toast.add({ title: 'Lien indisponible', description: apiErrorMessage(e), color: 'error' })
+  }
+}
+// Another language: the server writes its default message in that language (unless a text is typed again)
+watch(linkLang, (l) => {
+  if (l !== 'fr') linkText.value = ''
+})
+async function sendLink() {
+  if (!current.value) return
+  const to = linkChannel.value === 'email' ? `par e-mail à ${current.value.guestEmail}` : 'par la messagerie Lodgify'
+  if (!window.confirm(`Envoyer le livret à ${current.value.guest} ${to} ?`)) return
+  linkSending.value = true
+  try {
+    const r = await api<{ duplicate: boolean, demo?: boolean }>(`${base.value}/bookings/${current.value.id}/guest-link/send`, { method: 'POST', body: { channel: linkChannel.value, lang: linkLang.value, text: linkText.value, messageId: linkId.value } })
+    toast.add({ title: r.duplicate ? 'Déjà envoyé' : r.demo ? 'Envoyé (Rocket Mailer démo)' : 'Livret envoyé', color: 'success' })
+    linkOpen.value = false
+  }
+  catch (e) {
+    toast.add({ title: 'Envoi impossible', description: apiErrorMessage(e), color: 'error' })
+  }
+  finally {
+    linkSending.value = false
+  }
+}
 
 // Conversation (Lodgify thread) and value of the stay, loaded on selection
 const conv = ref<Message[] | null>(null)
@@ -197,6 +241,7 @@ async function generateCode() {
             <UBadge v-else-if="current.phase === 'next'" color="info" variant="subtle" label="À venir" />
             <UBadge :color="/book/i.test(current.status) ? 'success' : /declin|cancel/i.test(current.status) ? 'error' : 'info'" variant="subtle" :label="current.status" />
             <PlatformBadge :source="current.source" />
+            <UButton v-if="current.active && current.phase !== 'past'" icon="i-lucide-send" size="xs" variant="soft" label="Envoyer le livret" @click="openLink" />
           </div>
         </div>
 
@@ -320,5 +365,24 @@ async function generateCode() {
       </div>
     </div>
     <UCard v-else class="min-w-0 flex-1"><p class="text-sm text-muted">Sélectionne une réservation dans la liste.</p></UCard>
+
+    <UModal v-model:open="linkOpen" title="Envoyer le livret d’accueil" description="Rien n’est envoyé avant « Envoyer » et ta confirmation.">
+      <template #body>
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <USelect v-model="linkChannel" :items="[{ label: 'Message Lodgify', value: 'lodgify' }, { label: 'E-mail', value: 'email', disabled: !current?.guestEmail }]" class="w-44" />
+            <USelect v-model="linkLang" :items="WELCOME_LANGUAGES.map(l => ({ label: l.label, value: l.value }))" class="w-36" aria-label="Langue du message" />
+          </div>
+          <UTextarea v-model="linkText" :rows="7" autoresize :maxlength="5000" placeholder="Message par défaut dans la langue choisie" class="w-full" />
+          <p class="break-all text-xs text-muted">Lien : {{ linkUrl }} (ajouté au message s’il n’y figure pas). {{ linkChannel === 'email' ? `E-mail à ${current?.guestEmail} via Rocket Mailer.` : 'Message sur le canal de la réservation.' }}</p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="Annuler" @click="linkOpen = false" />
+          <UButton icon="i-lucide-send" label="Envoyer" :loading="linkSending" @click="sendLink" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

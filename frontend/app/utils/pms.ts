@@ -1,3 +1,4 @@
+import { renderSVG } from 'uqr'
 import { FetchError } from 'ofetch'
 
 /** Message of an API error (API Platform "detail", Symfony "detail" or HttpException message). */
@@ -78,3 +79,46 @@ export function weatherIcon(code: number): string {
 }
 
 export const frenchDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+/** QR code of a link as an SVG string (uqr, pure TS, computed in the browser: the link never leaves it). */
+export function qrSvg(text: string): string {
+  return renderSVG(text, { ecc: 'M', pixelSize: 6, border: 2 })
+}
+
+/** Languages of the welcome book (backend App\Entity\WelcomeBook::LANGUAGES), French first (default). */
+export const WELCOME_LANGUAGES: { value: import('~/types/pms').WelcomeLanguage, label: string, flag: string }[] = [
+  { value: 'fr', label: 'Français', flag: 'FR' },
+  { value: 'en', label: 'English', flag: 'EN' },
+  { value: 'es', label: 'Español', flag: 'ES' },
+  { value: 'de', label: 'Deutsch', flag: 'DE' },
+  { value: 'it', label: 'Italiano', flag: 'IT' },
+]
+
+type WelcomeUi = { welcome: string, code: string, valid: (from: string, until: string) => string, stay: (from: string, until: string) => string, wifi: string, network: string, password: string, checkout: string, nextArrival: string, locale: string, sections: Record<import('~/types/pms').WelcomeBookSection, string> }
+
+/** Texts of the public pages in each language of the book (the content itself is written by the host). */
+export const WELCOME_UI: Record<import('~/types/pms').WelcomeLanguage, WelcomeUi> = {
+  fr: { welcome: 'Bienvenue', code: 'Code de la porte', valid: (f, u) => `Valable du ${f} au ${u}`, stay: (f, u) => `Du ${f} au ${u}`, wifi: 'Wi-Fi', network: 'Réseau', password: 'Mot de passe', checkout: 'Départ', nextArrival: 'Prochaine arrivée', locale: 'fr-FR',
+    sections: { welcomeText: 'Mot de bienvenue', wifiSsid: 'Wi-Fi', wifiPassword: 'Mot de passe', checkinInfo: 'Arrivée', checkoutInfo: 'Départ', accessDirections: 'Accès au logement', houseRules: 'Règlement intérieur', contacts: 'Contacts', localTips: 'Bonnes adresses', faq: 'Questions fréquentes' } },
+  en: { welcome: 'Welcome', code: 'Door code', valid: (f, u) => `Valid from ${f} to ${u}`, stay: (f, u) => `From ${f} to ${u}`, wifi: 'Wi-Fi', network: 'Network', password: 'Password', checkout: 'Check-out', nextArrival: 'Next arrival', locale: 'en-GB',
+    sections: { welcomeText: 'Welcome', wifiSsid: 'Wi-Fi', wifiPassword: 'Password', checkinInfo: 'Check-in', checkoutInfo: 'Check-out', accessDirections: 'Getting there', houseRules: 'House rules', contacts: 'Contacts', localTips: 'Local tips', faq: 'FAQ' } },
+  es: { welcome: 'Bienvenido', code: 'Código de la puerta', valid: (f, u) => `Válido del ${f} al ${u}`, stay: (f, u) => `Del ${f} al ${u}`, wifi: 'Wi-Fi', network: 'Red', password: 'Contraseña', checkout: 'Salida', nextArrival: 'Próxima llegada', locale: 'es-ES',
+    sections: { welcomeText: 'Bienvenida', wifiSsid: 'Wi-Fi', wifiPassword: 'Contraseña', checkinInfo: 'Llegada', checkoutInfo: 'Salida', accessDirections: 'Cómo llegar', houseRules: 'Normas de la casa', contacts: 'Contactos', localTips: 'Recomendaciones', faq: 'Preguntas frecuentes' } },
+  de: { welcome: 'Willkommen', code: 'Türcode', valid: (f, u) => `Gültig von ${f} bis ${u}`, stay: (f, u) => `Vom ${f} bis ${u}`, wifi: 'WLAN', network: 'Netzwerk', password: 'Passwort', checkout: 'Abreise', nextArrival: 'Nächste Anreise', locale: 'de-DE',
+    sections: { welcomeText: 'Willkommen', wifiSsid: 'WLAN', wifiPassword: 'Passwort', checkinInfo: 'Anreise', checkoutInfo: 'Abreise', accessDirections: 'Anfahrt', houseRules: 'Hausordnung', contacts: 'Kontakte', localTips: 'Tipps', faq: 'Häufige Fragen' } },
+  it: { welcome: 'Benvenuto', code: 'Codice della porta', valid: (f, u) => `Valido dal ${f} al ${u}`, stay: (f, u) => `Dal ${f} al ${u}`, wifi: 'Wi-Fi', network: 'Rete', password: 'Password', checkout: 'Partenza', nextArrival: 'Prossimo arrivo', locale: 'it-IT',
+    sections: { welcomeText: 'Benvenuto', wifiSsid: 'Wi-Fi', wifiPassword: 'Password', checkinInfo: 'Arrivo', checkoutInfo: 'Partenza', accessDirections: 'Come arrivare', houseRules: 'Regole della casa', contacts: 'Contatti', localTips: 'Consigli', faq: 'Domande frequenti' } },
+}
+
+/** Local date (Y-m-d) in a language, e.g. "lundi 3 mars". */
+export const localDate = (ymd: string, locale: string) => new Date(`${ymd}T12:00:00`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
+
+/** Accent colour as a CSS custom property of the public pages (validated #rrggbb by the backend). */
+export const accentStyle = (accent: string | undefined) => ({ '--pms-accent': /^#[0-9a-f]{6}$/i.test(accent ?? '') ? accent : '#0f766e' })
+
+/** Absolute URL of the cover image of a public page (https URL, or the public cover endpoint of the API). */
+export function coverSrc(style: import('~/types/pms').PublicWelcomeStyle | undefined): string | null {
+  if (!style) return null
+  if (style.coverPath) return `${useRuntimeConfig().public.apiBase as string}${style.coverPath}`
+  return style.coverUrl && style.coverUrl.startsWith('https://') ? style.coverUrl : null
+}
