@@ -6,7 +6,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Rocket Mailer used whenever ROCKET_MAILER_URL / ROCKET_MAILER_TOKEN are not configured: a shared inbox "Contact"
+ * Rocket Mailer used whenever ROCKET_MAILER_URL / secret rocket.mailer.token are not configured: a shared inbox "Contact"
  * with a few fictitious conversations (same JSON shapes as Rocket Mailer's /api/inbox), and a send that is only
  * recorded in var/demo-mailer-<env>.json. Nothing ever leaves the server.
  */

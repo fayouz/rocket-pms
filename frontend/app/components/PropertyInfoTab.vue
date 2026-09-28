@@ -107,12 +107,16 @@ async function act(c: Connector, action: 'toggle' | 'remove' | 'test') {
           <UButton icon="i-lucide-plus" size="sm" label="Ajouter" @click="openEditor(null)" />
         </div>
       </template>
-      <p class="mb-3 text-sm text-muted">Sans connecteur, le compte Lodgify global (LODGIFY_API_KEY) est utilisé.</p>
+      <p class="mb-3 text-sm text-muted">Sans connecteur, le compte Lodgify global (secret « lodgify.api_key » du coffre) est utilisé.</p>
       <div class="space-y-2">
         <div v-for="c in connectors ?? []" :key="c.id" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-default p-2.5">
           <div>
             <b class="text-sm">{{ c.name }}</b>
-            <p class="text-xs text-muted">{{ c.config.secretVar }} · {{ c.lastResult ?? 'jamais testé' }}</p>
+            <p class="text-xs text-muted">
+              <span class="font-mono">{{ c.config.secret ?? c.config.secretVar }}</span>
+              <UBadge v-if="c.secrets.secret === false" color="warning" variant="subtle" size="sm" class="ml-1">absent du coffre</UBadge>
+              · {{ c.lastResult ?? 'jamais testé' }}
+            </p>
           </div>
           <div class="flex items-center gap-1.5">
             <UBadge :color="c.enabled ? 'success' : 'neutral'" variant="subtle" :label="c.enabled ? 'Actif' : 'Inactif'" />
@@ -133,7 +137,8 @@ async function act(c: Connector, action: 'toggle' | 'remove' | 'test') {
             <UInput v-model="form.name" class="w-full" />
           </UFormField>
           <UFormField v-for="f in lodgify?.fields ?? []" :key="f.key" :label="f.label" :help="f.help">
-            <UInput v-model="form.config[f.key]" :placeholder="f.placeholder" class="w-full" />
+            <SecretField v-if="f.secret" :model-value="form.config[f.key] ?? null" :default-name="f.defaultName" @update:model-value="(name: string | null) => (form.config[f.key] = name ?? '')" />
+            <UInput v-else v-model="form.config[f.key]" :placeholder="f.placeholder" class="w-full" />
           </UFormField>
         </div>
       </template>

@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Domotique\PluginRegistry;
-use App\Domotique\SecretEnv;
+use App\Domotique\ConnectorSecrets;
 use App\Entity\Connector;
 use App\Entity\Property;
 use App\Repository\ConnectorRepository;
@@ -25,6 +25,7 @@ final class ConnectorController extends AbstractController
         private readonly PluginRegistry $plugins,
         private readonly ConnectorRepository $connectors,
         private readonly EntityManagerInterface $em,
+        private readonly ConnectorSecrets $connectorSecrets,
     ) {
     }
 
@@ -111,8 +112,8 @@ final class ConnectorController extends AbstractController
         $out = [];
         foreach ($plugin->fields() as $f) {
             $v = \is_string($body[$f['key']] ?? null) ? trim($body[$f['key']]) : '';
-            if (($f['secret'] ?? false) && '' !== $v && !SecretEnv::isValidName($v)) {
-                throw new HttpException(400, \sprintf('« %s » : le nom de variable doit commencer par CONNECTOR_ (majuscules, chiffres, _).', $f['label']));
+            if (($f['secret'] ?? false) && '' !== $v && !ConnectorSecrets::isValidName($v)) {
+                throw new HttpException(400, \sprintf('« %s » : choisissez un secret du coffre (Administration → Secrets) ; les secrets propres à l’application sont interdits.', $f['label']));
             }
             if (($f['required'] ?? false) && '' === $v) {
                 throw new HttpException(400, \sprintf('« %s » est requis.', $f['label']));
@@ -133,7 +134,7 @@ final class ConnectorController extends AbstractController
         $secrets = [];
         foreach ($plugin->fields() as $f) {
             if ($f['secret'] ?? false) {
-                $secrets[$f['key']] = SecretEnv::isConfigured($config[$f['key']] ?? '');
+                $secrets[$f['key']] = $this->connectorSecrets->isConfigured(ConnectorSecrets::nameIn($config, $f['key']));
             }
         }
 

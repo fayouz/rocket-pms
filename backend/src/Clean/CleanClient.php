@@ -2,6 +2,7 @@
 
 namespace App\Clean;
 
+use App\Secrets\IntegrationSecrets;
 use App\Rocket\BrickClient;
 use Rocket\Core\Suite\ServiceTokenProvider;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -10,7 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Client of Rocket Clean (rocket-apps/rocket-clean), the owner of the cleanings. Same paths as the former cleanings of
  * Rocket Place: POST /api/places/{placeId}/cleanings (idempotent by externalRef), PATCH /api/cleanings/{id},
  * GET /api/cleanings/{id}/link, plus PUT /api/places/{placeId}/occupancy (stays of the property, so Clean flags the
- * personal/maintenance cleanings that overlap one). ROCKET_CLEAN_URL + ROCKET_CLEAN_TOKEN (rcl_…), suite mode by
+ * personal/maintenance cleanings that overlap one). ROCKET_CLEAN_URL + secret rocket.clean.token (rcl_…), suite mode by
  * Rocket Auth audience "rocket-clean"; without them App\Clean\DemoClean answers (no network call).
  */
 final class CleanClient extends BrickClient
@@ -19,7 +20,7 @@ final class CleanClient extends BrickClient
         HttpClientInterface $http,
         private readonly DemoClean $demoClean,
         string $cleanUrl,
-        string $cleanToken,
+        IntegrationSecrets|string $cleanToken,
         ?ServiceTokenProvider $serviceTokens = null,
     ) {
         parent::__construct($http, $cleanUrl, $cleanToken, $serviceTokens);
@@ -35,9 +36,9 @@ final class CleanClient extends BrickClient
         return 'rocket-clean';
     }
 
-    protected function tokenEnv(): string
+    protected function tokenSecret(): string
     {
-        return 'ROCKET_CLEAN_TOKEN';
+        return 'rocket.clean.token';
     }
 
     protected function demo(string $method, string $path, ?array $json, array $query): array

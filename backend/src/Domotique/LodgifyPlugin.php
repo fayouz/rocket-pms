@@ -11,7 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Lodgify as a connector plugin: several Lodgify accounts (several API keys) can be attached, one per property or
- * shared. The historical single `LODGIFY_API_KEY` env var stays supported as the fallback used for a property that
+ * shared. The historical single vault secret `lodgify.api_key` (formerly secret lodgify.api_key) stays supported as the fallback used for a property that
  * has no connector (App\Lodgify\BookingProviderRegistry), so existing properties keep working unchanged.
  */
 final class LodgifyPlugin implements PluginInterface, BookingCapablePluginInterface
@@ -19,6 +19,7 @@ final class LodgifyPlugin implements PluginInterface, BookingCapablePluginInterf
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly CacheInterface $cache,
+        private readonly ConnectorSecrets $connectorSecrets,
     ) {
     }
 
@@ -32,14 +33,14 @@ final class LodgifyPlugin implements PluginInterface, BookingCapablePluginInterf
     public function fields(): array
     {
         return [
-            ['key' => 'secretVar', 'label' => 'Variable .env de la clé API Lodgify', 'type' => 'text', 'required' => true, 'secret' => true, 'placeholder' => 'CONNECTOR_LODGIFY_SALON'],
+            ['key' => 'secret', 'label' => 'Clé API Lodgify (coffre des secrets)', 'type' => 'secret', 'required' => true, 'secret' => true, 'defaultName' => 'lodgify.salon.api_key'],
         ];
     }
 
     public function validate(array $config, string $propertyId, ?string $connectorId): array
     {
-        if ('' === ($config['secretVar'] ?? '') || !SecretEnv::isValidName($config['secretVar'])) {
-            throw new HttpException(400, 'Le nom de variable doit commencer par CONNECTOR_ (majuscules, chiffres, _).');
+        if (!ConnectorSecrets::isValidName(ConnectorSecrets::nameIn($config))) {
+            throw new HttpException(400, 'Choisissez un secret du coffre (Administration → Secrets) ; la clé Lodgify globale et les secrets propres à l’application sont interdits.');
         }
 
         return $config;
@@ -70,9 +71,9 @@ final class LodgifyPlugin implements PluginInterface, BookingCapablePluginInterf
     /** @param array<string, string> $config */
     private function client(array $config): LodgifyClient
     {
-        $secretVar = $config['secretVar'] ?? '';
-        $key = SecretEnv::read($secretVar, 'Clé API Lodgify');
+        $name = ConnectorSecrets::nameIn($config);
+        $key = $this->connectorSecrets->read($name, 'Clé API Lodgify');
 
-        return new LodgifyClient($this->http, $this->cache, $key, 'lodgify.'.$secretVar);
+        return new LodgifyClient($this->http, $this->cache, $key, 'lodgify.'.$name);
     }
 }

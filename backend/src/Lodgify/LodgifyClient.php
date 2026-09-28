@@ -2,6 +2,7 @@
 
 namespace App\Lodgify;
 
+use App\Secrets\IntegrationSecrets;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -9,7 +10,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Lodgify public API (v1 and v2): properties, bookings (cached 5 minutes), booking detail with its quote, messaging
- * thread, sending a message to the guest. Without LODGIFY_API_KEY, the demo data of DemoLodgify is used.
+ * thread, sending a message to the guest. Without secret lodgify.api_key, the demo data of DemoLodgify is used.
  */
 final class LodgifyClient implements BookingProviderInterface
 {
@@ -18,15 +19,21 @@ final class LodgifyClient implements BookingProviderInterface
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly CacheInterface $cache,
-        private readonly string $lodgifyApiKey,
+        private readonly IntegrationSecrets|string $lodgifyApiKey,
         /** Distinguishes the cache entries of several Lodgify accounts (one per connector) from the legacy global one. */
         private readonly string $cacheKeyPrefix = 'lodgify',
     ) {
     }
 
+    /** The token: fixed (per-connector client), or read at call time from the vault ("lodgify.api_key", see App\Secrets\IntegrationSecrets). */
+    private function lodgifyApiKey(): string
+    {
+        return $this->lodgifyApiKey instanceof IntegrationSecrets ? $this->lodgifyApiKey->get('lodgify.api_key') : $this->lodgifyApiKey;
+    }
+
     public function isDemo(): bool
     {
-        return '' === $this->lodgifyApiKey;
+        return '' === $this->lodgifyApiKey();
     }
 
     /** @return list<array{id: int, name: string, internalName: ?string, latitude: ?float, longitude: ?float}> */
@@ -151,7 +158,7 @@ final class LodgifyClient implements BookingProviderInterface
     private function request(string $method, string $path, array $options): array
     {
         $response = $this->http->request($method, self::BASE.$path, $options + [
-            'headers' => ['X-ApiKey' => $this->lodgifyApiKey, 'Accept' => 'application/json'],
+            'headers' => ['X-ApiKey' => $this->lodgifyApiKey(), 'Accept' => 'application/json'],
             'timeout' => 15,
         ]);
         $status = $response->getStatusCode();

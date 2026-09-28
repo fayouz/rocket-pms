@@ -2,6 +2,7 @@
 
 namespace App\Place;
 
+use App\Secrets\IntegrationSecrets;
 use App\Entity\Property;
 use App\Rocket\BrickClient;
 use Rocket\Core\Suite\ServiceTokenProvider;
@@ -14,13 +15,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Client of Rocket Place (rocket-apps/rocket-place), the owner of the places and of their locks and access grants,
  * connectors/domotique and documents (cleanings are Rocket Clean's: App\Clean\CleanClient; stock is Rocket Stock's:
- * App\Stock\StockClient). PMS holds one application token (ROCKET_PLACE_TOKEN, prefix rpl_) and a Property only keeps
+ * App\Stock\StockClient). PMS holds one application token (secret rocket.place.token, prefix rpl_) and a Property only keeps
  * the id of its place (Property::$placeId). The browser never talks to Rocket Place: App\Controller\PlaceProxyController
  * forwards the calls scoped to the property's place.
- * Without ROCKET_PLACE_URL/TOKEN: App\Place\DemoPlace answers (no network call, keeps tests offline).
+ * Without ROCKET_PLACE_URL + secret rocket.place.token: App\Place\DemoPlace answers (no network call, keeps tests offline).
  *
  * Suite mode (ROCKET_AUTH_URL + ROCKET_AUTH_CLIENT_SECRET): Rocket Auth token for the audience "rocket-place"
- * (App\Rocket\BrickClient), ROCKET_PLACE_TOKEN stays the fallback.
+ * (App\Rocket\BrickClient), secret rocket.place.token stays the fallback.
  */
 final class PlaceClient extends BrickClient
 {
@@ -30,7 +31,7 @@ final class PlaceClient extends BrickClient
         HttpClientInterface $http,
         private readonly DemoPlace $demoPlace,
         string $placeUrl,
-        string $placeToken,
+        IntegrationSecrets|string $placeToken,
         ?ServiceTokenProvider $serviceTokens = null,
     ) {
         parent::__construct($http, $placeUrl, $placeToken, $serviceTokens);
@@ -52,9 +53,9 @@ final class PlaceClient extends BrickClient
         return 'rocket-place';
     }
 
-    protected function tokenEnv(): string
+    protected function tokenSecret(): string
     {
-        return 'ROCKET_PLACE_TOKEN';
+        return 'rocket.place.token';
     }
 
     protected function demo(string $method, string $path, ?array $json, array $query): array
