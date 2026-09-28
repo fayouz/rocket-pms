@@ -2,6 +2,7 @@
 
 namespace App\Rocket;
 
+use App\Secrets\IntegrationSecrets;
 use Rocket\Core\Oidc\OidcException;
 use Rocket\Core\Suite\ServiceTokenProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -21,7 +22,7 @@ abstract class BrickClient
     public function __construct(
         protected readonly HttpClientInterface $http,
         private readonly string $brickUrl,
-        private readonly string $brickToken,
+        private readonly IntegrationSecrets|string $brickToken,
         protected readonly ?ServiceTokenProvider $serviceTokens = null,
     ) {
     }
@@ -32,8 +33,14 @@ abstract class BrickClient
     /** Rocket Auth audience of the brick ("rocket-place"). */
     abstract protected function audience(): string;
 
-    /** Environment variable of the static token, in messages. */
-    abstract protected function tokenEnv(): string;
+    /** Name of the static token in the secrets vault (App\Secrets\IntegrationSecrets), also used in messages. */
+    abstract protected function tokenSecret(): string;
+
+    /** The static token: fixed (tests), or read at call time from the vault. */
+    private function brickToken(): string
+    {
+        return $this->brickToken instanceof IntegrationSecrets ? $this->brickToken->get($this->tokenSecret()) : $this->brickToken;
+    }
 
     /**
      * Demo answer when the brick is not configured.
@@ -47,7 +54,7 @@ abstract class BrickClient
 
     public function isDemo(): bool
     {
-        return '' === trim($this->brickUrl) || ('' === trim($this->brickToken) && !$this->usesSuiteTokens());
+        return '' === trim($this->brickUrl) || ('' === trim($this->brickToken()) && !$this->usesSuiteTokens());
     }
 
     /** Whether calls use tokens of Rocket Auth (suite mode) rather than the static token. */
@@ -88,13 +95,13 @@ abstract class BrickClient
             try {
                 return $this->serviceTokens->tokenForClient($this->audience());
             } catch (OidcException $e) {
-                if ('' === trim($this->brickToken)) {
+                if ('' === trim($this->brickToken())) {
                     throw new HttpException(502, \sprintf('Rocket Auth ne délivre pas de jeton pour %s : %s', $this->brickName(), $e->getMessage()));
                 }
             }
         }
 
-        return $this->brickToken;
+        return $this->brickToken();
     }
 
     /** @param array<string, mixed> $options */
@@ -124,7 +131,7 @@ abstract class BrickClient
                 $this->serviceTokens->forget($this->audience());
                 throw new HttpException(502, "Jeton Rocket Auth refusé par $name (client rocket-pms lié à une application ?).");
             }
-            throw new HttpException(502, \sprintf('Jeton %s refusé (%s).', $name, $this->tokenEnv()));
+            throw new HttpException(502, \sprintf('Jeton %s refusé (secret %s).', $name, $this->tokenSecret()));
         }
         if (403 === $status) {
             throw new HttpException(502, "$name refuse cette action à l’application Rocket PMS.");

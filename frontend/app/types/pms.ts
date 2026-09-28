@@ -67,7 +67,10 @@ export interface PluginField {
   label: string
   type: string
   required?: boolean
+  /** The value is the NAME of a secret of the vault (SecretField), never the secret itself. */
   secret?: boolean
+  /** Suggested name when creating the secret from the form. */
+  defaultName?: string
   help?: string
   placeholder?: string
   options?: { label: string, value: string }[]

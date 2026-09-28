@@ -3,7 +3,7 @@
 namespace App\Lodgify;
 
 /**
- * Fictitious Lodgify data (no LODGIFY_API_KEY): two properties, a few bookings around today, one conversation.
+ * Fictitious Lodgify data (no secret lodgify.api_key): two properties, a few bookings around today, one conversation.
  * Every active booking has a guest e-mail matching a conversation of App\Mailer\DemoMailer (e-mails tab in demo);
  * the declined booking 6 has none.
  */

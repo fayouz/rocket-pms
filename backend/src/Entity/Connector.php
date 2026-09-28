@@ -10,8 +10,8 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * A plugin of the catalogue (App\Domotique\PluginRegistry) configured for a property: several per property allowed
- * (in PMS: Lodgify accounts only; physical connectors live in Rocket Place). Config holds only non-secret values; a field flagged "secret" holds the NAME of a .env variable
- * (never the value, see App\Domotique\SecretEnv). Admin-only writes (App\Controller\ConnectorController).
+ * (in PMS: Lodgify accounts only; physical connectors live in Rocket Place). Config holds only non-secret values; a field flagged "secret" holds the NAME of a secret of the
+ * rocket-core vault (never the value, see App\Domotique\ConnectorSecrets). Admin-only writes (App\Controller\ConnectorController).
  */
 #[ORM\Entity(repositoryClass: ConnectorRepository::class)]
 class Connector

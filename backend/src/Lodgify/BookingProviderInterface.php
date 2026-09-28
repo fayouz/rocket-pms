@@ -5,7 +5,7 @@ namespace App\Lodgify;
 /**
  * A source of bookings, prices and guest conversations (Lodgify today, possibly another channel manager tomorrow).
  * Implemented by App\Lodgify\LodgifyClient; resolved per property by App\Lodgify\BookingProviderRegistry from the
- * property's own connector (App\Domotique\LodgifyPlugin), falling back to the single legacy LODGIFY_API_KEY.
+ * property's own connector (App\Domotique\LodgifyPlugin), falling back to the single legacy secret lodgify.api_key.
  */
 interface BookingProviderInterface
 {

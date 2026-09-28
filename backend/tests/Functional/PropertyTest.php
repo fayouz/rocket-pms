@@ -123,17 +123,17 @@ final class PropertyTest extends WebTestCase
     }
 
     /**
-     * A "lodgify" connector on the property is picked over the legacy LODGIFY_API_KEY fallback
-     * (App\Lodgify\BookingProviderRegistry): here it points at a CONNECTOR_ variable that is not set in .env, so the
+     * A "lodgify" connector on the property is picked over the legacy global lodgify.api_key fallback
+     * (App\Lodgify\BookingProviderRegistry): here it points at a secret that is not in the vault, so the
      * bookings endpoint fails instead of silently falling back to the demo/global account — proof that the
-     * connector, not the legacy client, was resolved. No network call is made (App\Domotique\SecretEnv fails first).
+     * connector, not the legacy client, was resolved. No network call is made (App\Domotique\ConnectorSecrets fails first: secret absent).
      */
     public function testAPropertyConnectorIsPreferredOverTheLegacyLodgifyAccount(): void
     {
         $port = $this->seed();
         self::assertTrue($this->api('GET', "/api/properties/$port/bookings", null, $this->user)['demo'], 'no connector yet: legacy/demo client answers');
 
-        $connector = $this->api('POST', "/api/properties/$port/connectors", ['pluginId' => 'lodgify', 'config' => ['secretVar' => 'CONNECTOR_LODGIFY_TEST']], $this->admin);
+        $connector = $this->api('POST', "/api/properties/$port/connectors", ['pluginId' => 'lodgify', 'config' => ['secret' => 'lodgify.test.api_key']], $this->admin);
         $this->assertStatus(201);
 
         $this->api('GET', "/api/properties/$port/bookings", null, $this->user);

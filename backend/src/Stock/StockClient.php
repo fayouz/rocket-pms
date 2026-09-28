@@ -2,6 +2,7 @@
 
 namespace App\Stock;
 
+use App\Secrets\IntegrationSecrets;
 use App\Rocket\BrickClient;
 use Rocket\Core\Suite\ServiceTokenProvider;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -9,7 +10,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Client of Rocket Stock (rocket-apps/rocket-stock), the owner of the stock of the places. Rocket Stock keeps the paths
  * of the former stock of Rocket Place (GET /api/stock-items, GET /api/stock-levels?place=<IRI>, PATCH
- * /api/stock-levels/{id} {"level"}). ROCKET_STOCK_URL + ROCKET_STOCK_TOKEN (rst_…), suite mode by Rocket Auth audience
+ * /api/stock-levels/{id} {"level"}). ROCKET_STOCK_URL + secret rocket.stock.token (rst_…), suite mode by Rocket Auth audience
  * "rocket-stock"; without them App\Stock\DemoStock answers (no network call).
  */
 final class StockClient extends BrickClient
@@ -18,7 +19,7 @@ final class StockClient extends BrickClient
         HttpClientInterface $http,
         private readonly DemoStock $demoStock,
         string $stockUrl,
-        string $stockToken,
+        IntegrationSecrets|string $stockToken,
         ?ServiceTokenProvider $serviceTokens = null,
     ) {
         parent::__construct($http, $stockUrl, $stockToken, $serviceTokens);
@@ -34,9 +35,9 @@ final class StockClient extends BrickClient
         return 'rocket-stock';
     }
 
-    protected function tokenEnv(): string
+    protected function tokenSecret(): string
     {
-        return 'ROCKET_STOCK_TOKEN';
+        return 'rocket.stock.token';
     }
 
     protected function demo(string $method, string $path, ?array $json, array $query): array
