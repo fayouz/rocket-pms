@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { Booking, Lock, Message, Pricing } from '~/types/pms'
+import type { Booking, BookingEmails, GuestLink, Lock, Message, Pricing, WelcomeLanguage } from '~/types/pms'
 
 // Bookings of a property, like a mail client: compact list on the left (search, filter, sort), detail on the right
-// (conversation with the guest and reply 2/3; value of the stay and smart lock 1/3).
+// (conversation with the guest and reply 2/3; value of the stay and smart lock 1/3). The composer writes either a
+// Lodgify message or an e-mail through Rocket Mailer; e-mail conversations of the shared inbox linked to the booking
+// are listed under the Lodgify thread.
 const props = defineProps<{ propertyId: string }>()
 const api = useApi()
 const toast = useToast()
@@ -36,44 +38,134 @@ watchEffect(() => {
 })
 const current = computed(() => data.value?.items.find(b => b.id === selected.value) ?? null)
 
-// Reply draft (declared before the watcher below, which resets it)
+// Reply draft (declared before the watcher below, which resets it); channel: Lodgify message or e-mail (Rocket Mailer)
+const channel = ref<'lodgify' | 'email'>('lodgify')
+const channelItems = [{ label: 'Message Lodgify', value: 'lodgify', icon: 'i-lucide-message-circle' }, { label: 'E-mail', value: 'email', icon: 'i-lucide-mail' }]
+const subject = ref('')
 const draft = ref('')
 const draftId = ref(crypto.randomUUID())
 const sending = ref(false)
+
+// Sending the welcome-book link to the guest: prepared in a window, sent only on "Envoyer" + confirmation
+const linkOpen = ref(false)
+const linkChannel = ref<'lodgify' | 'email'>('lodgify')
+const linkLang = ref<WelcomeLanguage>('fr')
+const linkText = ref('')
+const linkUrl = ref('')
+const linkId = ref('')
+const linkSending = ref(false)
+async function openLink() {
+  if (!current.value) return
+  try {
+    const link = await api<GuestLink>(`${base.value}/bookings/${current.value.id}/guest-link`)
+    linkUrl.value = link.url
+    linkText.value = link.message
+    linkChannel.value = current.value.guestEmail ? 'email' : 'lodgify'
+    linkId.value = crypto.randomUUID()
+    linkOpen.value = true
+  }
+  catch (e) {
+    toast.add({ title: 'Lien indisponible', description: apiErrorMessage(e), color: 'error' })
+  }
+}
+// Another language: the server writes its default message in that language (unless a text is typed again)
+watch(linkLang, (l) => {
+  if (l !== 'fr') linkText.value = ''
+})
+async function sendLink() {
+  if (!current.value) return
+  const to = linkChannel.value === 'email' ? `par e-mail à ${current.value.guestEmail}` : 'par la messagerie Lodgify'
+  if (!window.confirm(`Envoyer le livret à ${current.value.guest} ${to} ?`)) return
+  linkSending.value = true
+  try {
+    const r = await api<{ duplicate: boolean, demo?: boolean }>(`${base.value}/bookings/${current.value.id}/guest-link/send`, { method: 'POST', body: { channel: linkChannel.value, lang: linkLang.value, text: linkText.value, messageId: linkId.value } })
+    toast.add({ title: r.duplicate ? 'Déjà envoyé' : r.demo ? 'Envoyé (Rocket Mailer démo)' : 'Livret envoyé', color: 'success' })
+    linkOpen.value = false
+  }
+  catch (e) {
+    toast.add({ title: 'Envoi impossible', description: apiErrorMessage(e), color: 'error' })
+  }
+  finally {
+    linkSending.value = false
+  }
+}
 
 // Conversation (Lodgify thread) and value of the stay, loaded on selection
 const conv = ref<Message[] | null>(null)
 const convError = ref('')
 const pricing = ref<Pricing | null>(null)
 const convBox = ref<HTMLElement | null>(null)
+// E-mail conversations of the shared inbox (Rocket Mailer) linked to the booking; one opened at a time
+const emails = ref<BookingEmails | null>(null)
+const emailsError = ref('')
+const openedEmail = ref<string | null>(null)
+const emailThread = ref<Message[] | null>(null)
 watch(selected, async (id) => {
   conv.value = null
   pricing.value = null
+  emails.value = null
+  emailsError.value = ''
+  openedEmail.value = null
+  emailThread.value = null
   convError.value = ''
   draft.value = ''
+  subject.value = ''
   draftId.value = crypto.randomUUID()
   if (id === null) return
-  const [c, p] = await Promise.allSettled([
+  const [c, p, e] = await Promise.allSettled([
     api<{ messages: Message[] }>(`${base.value}/bookings/${id}/conversation`),
     api<Pricing>(`${base.value}/bookings/${id}/pricing`),
+    api<BookingEmails>(`${base.value}/bookings/${id}/emails`),
   ])
   if (selected.value !== id) return
   if (c.status === 'fulfilled') conv.value = c.value.messages
   else convError.value = apiErrorMessage(c.reason)
   if (p.status === 'fulfilled') pricing.value = p.value
+  if (e.status === 'fulfilled') emails.value = e.value
+  else emailsError.value = apiErrorMessage(e.reason)
   await nextTick()
   if (convBox.value) convBox.value.scrollTop = convBox.value.scrollHeight
 }, { immediate: true })
 
-// Reply to the guest (Lodgify pushes it on the booking's channel); one id per draft: a retry is not sent twice
+async function toggleEmail(conversationId: string) {
+  if (openedEmail.value === conversationId) {
+    openedEmail.value = null
+    return
+  }
+  openedEmail.value = conversationId
+  emailThread.value = null
+  try {
+    emailThread.value = (await api<{ messages: Message[] }>(`${base.value}/bookings/${selected.value}/emails/${conversationId}`)).messages
+  }
+  catch (error) {
+    openedEmail.value = null
+    toast.add({ title: 'Conversation indisponible', description: apiErrorMessage(error), color: 'error' })
+  }
+}
+
+const canSend = computed(() => channel.value === 'lodgify'
+  ? !!draft.value.trim() && !data.value?.demo && !convError.value
+  : !!draft.value.trim() && !!subject.value.trim() && !!emails.value?.guestEmail)
+
+// Reply to the guest, only on click: Lodgify pushes a message on the booking's channel, Rocket Mailer sends an
+// e-mail to the guest's address. One id per draft: a retry is not sent twice.
 async function send() {
-  if (!draft.value.trim() || selected.value === null) return
+  if (!canSend.value || selected.value === null) return
+  const id = selected.value
   sending.value = true
   try {
-    await api(`${base.value}/bookings/${selected.value}/conversation`, { method: 'POST', body: { text: draft.value, messageId: draftId.value } })
+    if (channel.value === 'email') {
+      const r = await api<{ demo: boolean }>(`${base.value}/bookings/${id}/emails`, { method: 'POST', body: { subject: subject.value, text: draft.value, messageId: draftId.value } })
+      toast.add({ title: r.demo ? 'Mode démo : e-mail enregistré, non envoyé' : 'E-mail confié à Rocket Mailer', color: 'success' })
+      subject.value = ''
+      emails.value = await api<BookingEmails>(`${base.value}/bookings/${id}/emails`)
+    }
+    else {
+      await api(`${base.value}/bookings/${id}/conversation`, { method: 'POST', body: { text: draft.value, messageId: draftId.value } })
+      conv.value = (await api<{ messages: Message[] }>(`${base.value}/bookings/${id}/conversation`)).messages
+    }
     draft.value = ''
     draftId.value = crypto.randomUUID()
-    conv.value = (await api<{ messages: Message[] }>(`${base.value}/bookings/${selected.value}/conversation`)).messages
   }
   catch (error) {
     toast.add({ title: 'Message non envoyé', description: apiErrorMessage(error), color: 'error' })
@@ -149,6 +241,7 @@ async function generateCode() {
             <UBadge v-else-if="current.phase === 'next'" color="info" variant="subtle" label="À venir" />
             <UBadge :color="/book/i.test(current.status) ? 'success' : /declin|cancel/i.test(current.status) ? 'error' : 'info'" variant="subtle" :label="current.status" />
             <PlatformBadge :source="current.source" />
+            <UButton v-if="current.active && current.phase !== 'past'" icon="i-lucide-send" size="xs" variant="soft" label="Envoyer le livret" @click="openLink" />
           </div>
         </div>
 
@@ -168,11 +261,44 @@ async function generateCode() {
           </div>
         </div>
 
-        <div v-if="!convError" class="mt-4 space-y-2 border-t border-default pt-4">
-          <UTextarea v-model="draft" :rows="3" autoresize placeholder="Écrire au voyageur…" class="w-full" :disabled="sending" />
+        <!-- E-mails of the shared inbox (Rocket Mailer) linked to the booking -->
+        <h4 class="mt-6 mb-2 flex items-center gap-1.5 text-sm font-semibold"><UIcon name="i-lucide-mail" class="size-4 text-muted" /> E-mails liés</h4>
+        <p v-if="emailsError" class="text-sm text-muted">E-mails indisponibles : {{ emailsError }}</p>
+        <p v-else-if="!emails" class="text-sm text-muted">Chargement…</p>
+        <p v-else-if="!emails.available" class="text-sm text-muted">{{ emails.reason }}</p>
+        <p v-else-if="!emails.conversations.length" class="text-sm text-muted">Aucun e-mail lié{{ emails.guestEmail ? ` (${emails.guestEmail})` : ' : Lodgify ne donne pas l’adresse du voyageur' }}.</p>
+        <div v-else class="space-y-1.5">
+          <div v-for="c in emails.conversations" :key="c.id" class="rounded-md border border-default">
+            <button type="button" class="flex w-full items-start justify-between gap-2 p-2 text-left hover:bg-elevated" @click="toggleEmail(c.id)">
+              <span class="min-w-0">
+                <b class="block truncate text-sm">{{ c.subject || '(sans objet)' }}</b>
+                <span class="block truncate text-xs text-muted">{{ c.snippet }}</span>
+              </span>
+              <span class="shrink-0 text-right text-xs text-muted">
+                {{ whenFr(c.lastMessageAt) }}<br>
+                <UBadge size="sm" variant="subtle" :color="c.matchedBy === 'guest' ? 'info' : 'neutral'" :label="c.matchedBy === 'guest' ? 'Voyageur' : 'N° de réservation'" />
+              </span>
+            </button>
+            <div v-if="openedEmail === c.id" class="space-y-2 border-t border-default p-2">
+              <p v-if="!emailThread" class="text-sm text-muted">Chargement…</p>
+              <div v-for="m in emailThread ?? []" :key="m.key" class="flex" :class="m.from === 'host' ? 'justify-end' : 'justify-start'">
+                <div class="max-w-[85%] rounded-lg px-3 py-2 text-sm" :class="m.from === 'host' ? 'bg-primary/10' : 'bg-elevated'">
+                  <p class="mb-1 text-xs text-muted">{{ m.from === 'host' ? 'Toi' : current.guest }} · {{ whenFr(m.at) }}</p>
+                  <p class="whitespace-pre-line">{{ m.text }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-2 border-t border-default pt-4">
+          <UTabs v-model="channel" :items="channelItems" :content="false" size="xs" variant="pill" class="w-fit" />
+          <UInput v-if="channel === 'email'" v-model="subject" placeholder="Objet" :maxlength="200" class="w-full" :disabled="sending || !emails?.guestEmail" />
+          <UTextarea v-model="draft" :rows="3" autoresize :placeholder="channel === 'email' ? 'Écrire un e-mail au voyageur…' : 'Écrire au voyageur…'" class="w-full" :disabled="sending || (channel === 'lodgify' && !!convError)" />
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-xs text-muted">Envoyé à {{ current.guest }} via {{ current.source || 'Lodgify' }}.</p>
-            <UButton icon="i-lucide-send" label="Envoyer" :loading="sending" :disabled="!draft.trim() || data.demo" @click="send" />
+            <p v-if="channel === 'lodgify'" class="text-xs text-muted">{{ convError ? 'Messagerie Lodgify indisponible.' : `Envoyé à ${current.guest} via ${current.source || 'Lodgify'}.` }}</p>
+            <p v-else class="text-xs text-muted">{{ emails?.guestEmail ? `E-mail à ${emails.guestEmail} via Rocket Mailer.` : 'Pas d’adresse e-mail pour ce voyageur.' }}</p>
+            <UButton icon="i-lucide-send" :label="channel === 'email' ? 'Envoyer l’e-mail' : 'Envoyer'" :loading="sending" :disabled="!canSend" @click="send" />
           </div>
         </div>
       </UCard>
@@ -239,5 +365,24 @@ async function generateCode() {
       </div>
     </div>
     <UCard v-else class="min-w-0 flex-1"><p class="text-sm text-muted">Sélectionne une réservation dans la liste.</p></UCard>
+
+    <UModal v-model:open="linkOpen" title="Envoyer le livret d’accueil" description="Rien n’est envoyé avant « Envoyer » et ta confirmation.">
+      <template #body>
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <USelect v-model="linkChannel" :items="[{ label: 'Message Lodgify', value: 'lodgify' }, { label: 'E-mail', value: 'email', disabled: !current?.guestEmail }]" class="w-44" />
+            <USelect v-model="linkLang" :items="WELCOME_LANGUAGES.map(l => ({ label: l.label, value: l.value }))" class="w-36" aria-label="Langue du message" />
+          </div>
+          <UTextarea v-model="linkText" :rows="7" autoresize :maxlength="5000" placeholder="Message par défaut dans la langue choisie" class="w-full" />
+          <p class="break-all text-xs text-muted">Lien : {{ linkUrl }} (ajouté au message s’il n’y figure pas). {{ linkChannel === 'email' ? `E-mail à ${current?.guestEmail} via Rocket Mailer.` : 'Message sur le canal de la réservation.' }}</p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="Annuler" @click="linkOpen = false" />
+          <UButton icon="i-lucide-send" label="Envoyer" :loading="linkSending" @click="sendLink" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

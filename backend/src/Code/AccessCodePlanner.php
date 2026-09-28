@@ -2,6 +2,7 @@
 
 namespace App\Code;
 
+use App\Cleaning\CleaningPlanner;
 use App\Entity\Property;
 use App\Lodgify\Booking;
 use App\Lodgify\BookingProviderRegistry;
@@ -18,7 +19,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * planning is idempotent (an existing grant for that booking is reused). A planned grant whose booking dates changed
  * is revoked and re-planned; a grant already sent to the lock is never touched (flagged "outdated").
  * Sending the code to the lock stays an explicit user click (::send), never implicit. A stay that has started is
- * never touched again.
+ * never touched again. Planning also syncs the cleanings after each departure (App\Cleaning\CleaningPlanner); a
+ * failure there (Rocket Clean unreachable, 4xx) never blocks the codes.
  */
 final class AccessCodePlanner
 {
@@ -33,6 +35,7 @@ final class AccessCodePlanner
         private readonly ClockInterface $clock,
         private readonly TranslatorInterface $translator,
         private readonly string $timezone,
+        private readonly ?CleaningPlanner $cleanings = null,
     ) {
     }
 
@@ -54,6 +57,7 @@ final class AccessCodePlanner
      */
     public function plan(Property $property): array
     {
+        $this->lastCleanings = [];
         $placeId = $property->getPlaceId();
         if (null === $placeId) {
             return [];
@@ -83,10 +87,46 @@ final class AccessCodePlanner
                 ]);
                 $changed = true;
             }
+            $this->syncCleanings($property, $placeId);
 
             return $changed ? $this->grants($placeId) : $grants;
         } finally {
             $lock->release();
+        }
+    }
+
+    /**
+     * Live grants of the property's place, indexed by externalRef (booking id), without planning anything (read-only,
+     * used by the timeline). Empty when the property has no place.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function liveGrants(Property $property): array
+    {
+        $placeId = $property->getPlaceId();
+
+        return null === $placeId ? [] : $this->grants($placeId);
+    }
+
+    /** Cleanings of the place after this sync, indexed by externalRef ("booking:<id>:checkout"); empty when unavailable. @var array<string, array<string, mixed>> */
+    private array $lastCleanings = [];
+
+    /** @return array<string, array<string, mixed>> cleanings of the last ::plan of this property's place */
+    public function lastCleanings(): array
+    {
+        return $this->lastCleanings;
+    }
+
+    private function syncCleanings(Property $property, string $placeId): void
+    {
+        $this->lastCleanings = [];
+        if (null === $this->cleanings) {
+            return;
+        }
+        try {
+            $this->lastCleanings = $this->cleanings->sync($placeId, $this->bookingsOf($property), $this);
+        } catch (HttpException) {
+            // Rocket Clean unreachable or refusing them: the access codes are still planned
         }
     }
 

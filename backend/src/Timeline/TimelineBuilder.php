@@ -2,14 +2,15 @@
 
 namespace App\Timeline;
 
+use App\Cleaning\CleaningPlanner;
 use App\Code\AccessCodePlanner;
 use App\Entity\Property;
 use App\Place\PlaceClient;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Timeline of a property: arrivals and departures, keypad code opening and expiry (access grants of Rocket Place),
- * and the last events of the locks of its place, between $past days ago and $future days ahead, sorted by date.
+ * Read-only timeline of a property (planning codes and cleanings is App\Planning\PlanningRunner's job, never a read): arrivals and departures, keypad code opening and expiry (access grants of Rocket Place),
+ * the cleanings after each departure (Rocket Clean cleanings planned by PMS), and the last events of the locks of its place, between $past days ago and $future days ahead, sorted by date.
  */
 final class TimelineBuilder
 {
@@ -18,6 +19,7 @@ final class TimelineBuilder
     public function __construct(
         private readonly PlaceClient $place,
         private readonly AccessCodePlanner $planner,
+        private readonly CleaningPlanner $cleaningPlanner,
     ) {
     }
 
@@ -29,10 +31,15 @@ final class TimelineBuilder
         $in = static fn (\DateTimeImmutable $d) => $d >= $from && $d <= $to;
         $events = [];
         try {
-            $grants = $this->planner->plan($property);
+            $grants = $this->planner->liveGrants($property);
             $locks = null === $property->getPlaceId() ? [] : ($this->place->request('GET', '/api/places/'.$property->getPlaceId().'/locks')['locks'] ?? []);
         } catch (HttpException) {
             [$grants, $locks] = [[], []]; // Rocket Place unreachable: the stays are still shown
+        }
+        try {
+            $cleanings = null === $property->getPlaceId() ? [] : $this->cleaningPlanner->cleanings($property->getPlaceId());
+        } catch (HttpException) {
+            $cleanings = []; // Rocket Clean unreachable
         }
         foreach ($this->planner->bookingsOf($property) as $b) {
             if (!$b->isActive()) {
@@ -58,6 +65,15 @@ final class TimelineBuilder
                 if ($in($closes)) {
                     $events[] = ['at' => $closes, 'kind' => 'code', 'icon' => 'i-lucide-lock', 'title' => 'Code '.$grant['code'].' expire · '.$b->guest, 'description' => $state];
                 }
+            }
+        }
+        foreach ($cleanings as $c) {
+            $at = new \DateTimeImmutable((string) $c['scheduledAt']);
+            if ($in($at) && 'cancelled' !== ($c['status'] ?? null)) {
+                $state = ['todo' => 'à faire', 'in_progress' => 'en cours', 'done' => 'terminé'][$c['status'] ?? ''] ?? (string) ($c['status'] ?? '');
+                $due = null === ($c['dueAt'] ?? null) ? '' : ' · avant le '.(new \DateTimeImmutable((string) $c['dueAt']))->setTimezone($at->getTimezone())->format('d/m H:i');
+                $who = \is_array($c['assignee'] ?? null) ? ' · '.($c['assignee']['name'] ?? $c['assignee']['email'] ?? '') : '';
+                $events[] = ['at' => $at, 'kind' => 'cleaning', 'icon' => 'i-lucide-spray-can', 'title' => (string) ($c['label'] ?? 'Ménage'), 'description' => $state.$due.$who, 'cleaningId' => (string) ($c['id'] ?? '')];
             }
         }
         foreach ($locks as $l) {

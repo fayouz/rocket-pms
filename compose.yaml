@@ -18,6 +18,12 @@ x-api-env: &api-env
   # Rocket Place (locks and access grants, domotique, documents, stock of each place). Empty: demo places.
   ROCKET_PLACE_URL: ${ROCKET_PLACE_URL:-}
   ROCKET_PLACE_TOKEN: ${ROCKET_PLACE_TOKEN:-}
+  # Rocket Clean (cleanings) and Rocket Stock (stock). Empty: demo.
+  ROCKET_CLEAN_URL: ${ROCKET_CLEAN_URL:-}
+  ROCKET_CLEAN_TOKEN: ${ROCKET_CLEAN_TOKEN:-}
+  ROCKET_STOCK_URL: ${ROCKET_STOCK_URL:-}
+  ROCKET_STOCK_TOKEN: ${ROCKET_STOCK_TOKEN:-}
+  ROCKET_CAST_FRONT_URL: ${ROCKET_CAST_FRONT_URL:-}
   PMS_TIMEZONE: ${PMS_TIMEZONE:-Europe/Paris}
   # Suite mode: sign-in through Rocket Auth (see rocket-core). Empty ROCKET_AUTH_URL: standalone.
   ROCKET_AUTH_URL: ${ROCKET_AUTH_URL:-}

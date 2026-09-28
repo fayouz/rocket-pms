@@ -106,6 +106,10 @@ final class PropertyTest extends WebTestCase
     {
         $port = $this->seed();
         $events = $this->api('GET', "/api/properties/$port/timeline?past=5&future=15", null, $this->user)['events'];
+        self::assertEmpty(array_filter(array_column($events, 'title'), static fn (string $t) => str_starts_with($t, 'Code ')), 'the timeline only reads: nothing planned yet');
+        $this->api('POST', '/api/planning/run', null, $this->admin);
+        $this->assertStatus(200);
+        $events = $this->api('GET', "/api/properties/$port/timeline?past=5&future=15", null, $this->user)['events'];
         $titles = array_column($events, 'title');
         self::assertContains('Arrivée · Sofia Rossi', $titles);
         self::assertContains('Départ · Alex Martin', $titles);
