@@ -5,6 +5,10 @@ Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https:/
 ## [Non publié]
 
 ### Ajouté
+- **Planification** des codes et ménages : tâche récurrente rocket-core toutes les 15 minutes (`App\Planning\PlanningSchedule`, message `RunPlanning`) et `POST /api/planning/run` (PMS_MANAGE, ouvert aux applications) ; bouton « Lancer la planification » (administrateur) sur la page Timeline.
+- **Lien ménage** : `GET /api/properties/{id}/cleanings` et `GET /api/properties/{id}/cleanings/{cleaningId}/link` (PMS_MANAGE, ouverts aux applications), `PlaceClient::cleaningLink`, Rocket Place de démo étendu ; « Copier le lien ménage » dans les ménages de la timeline.
+- **Liaisons Place** (Administration) : chaque logement avec son id Lodgify, son lieu Rocket Place (lien vers le front Place si `ROCKET_PLACE_FRONT_URL`), l'état de la liaison (lié, non lié, lieu introuvable, Place injoignable), serrures, accès à venir, ménages ouverts, stock bas ; lier, changer, délier, créer le lieu depuis le logement. `GET /api/place-links` (PMS_MANAGE, ouvert aux applications).
+- **Démo** : chaque réservation active a une adresse e-mail et une conversation Rocket Mailer de démo correspondante.
 - **Livret multilingue** : français par défaut, anglais, espagnol, allemand, italien facultatifs par rubrique (repli français) ; langue de la page voyageur et de l'écran TV d'après `?lang=` puis `Accept-Language`, sélecteur de langue sur la page.
 - **Apparence du livret** par logement : couleur d'accent, image de couverture (https ou document image du lieu Rocket Place, route publique `/cover`), disposition onglets ou colonnes.
 - **QR codes** du lien TV et des liens voyageurs, dessinés dans le navigateur (`uqr`).
@@ -19,6 +23,9 @@ Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https:/
 - Mode suite documenté (Rocket Auth : connexion, sélecteur d'applications, déconnexion ; variables `ROCKET_AUTH_*`, `ROCKET_PUBLIC_URL`, `ROCKET_INTERNAL_URL`).
 - Rocket Place appelé avec un jeton Rocket Auth en mode suite (client credentials, audience `rocket-place`) ; `ROCKET_PLACE_TOKEN` reste le repli.
 - `compose.suite.yaml` : Rocket Auth, Rocket Cloud (depuis les dépôts rocket-middleware voisins), Rocket Place et Rocket PMS en mode suite, avec données de démo et applications liées aux clients Rocket Auth.
+
+### Modifié
+- La **timeline** ne fait plus que lire (plus aucun accès ni ménage créé dans Rocket Place en l'affichant).
 
 ## [0.2.0] - 2026-09-28
 

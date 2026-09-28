@@ -277,12 +277,12 @@ final class WelcomeBookTest extends WebTestCase
         self::assertSame(['paul.demo@example.org'], $mails[0]['to']);
         self::assertStringStartsWith('Your welcome book', $mails[0]['subject']);
 
-        // Lodgify in demo mode refuses to send (never a silent success); no e-mail for a guest without address
+        // Lodgify in demo mode refuses to send (never a silent success); nothing for a declined booking
         $port = array_column($this->api('GET', '/api/properties', null, $this->admin), 'id', 'name')['Le port'];
         $this->api('POST', "/api/properties/$port/bookings/3/guest-link/send", ['channel' => 'lodgify', 'messageId' => '0192f7c4-0000-7000-8000-00000000abce'], $this->user);
         $this->assertStatus(400);
-        $this->api('POST', "/api/properties/$port/bookings/3/guest-link/send", ['channel' => 'email', 'messageId' => '0192f7c4-0000-7000-8000-00000000abcf'], $this->user);
-        $this->assertStatus(422);
+        $this->api('POST', "/api/properties/$vignes/bookings/6/guest-link/send", ['channel' => 'email', 'messageId' => '0192f7c4-0000-7000-8000-00000000abcf'], $this->user);
+        $this->assertStatus(409); // declined booking (no guest address either): never sent
     }
 
     public function testInvalidTokensAreRateLimited(): void

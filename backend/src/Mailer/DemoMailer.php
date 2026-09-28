@@ -101,6 +101,16 @@ final class DemoMailer
             $conv('0192f7c4-0000-7000-8000-00000000c002', 'Facture de votre séjour', 'paul.demo@example.org', 'Paul Morel', [
                 ['type' => 'inbound', 'id' => 'm3', 'at' => $at('-1 day'), 'from' => 'paul.demo@example.org', 'subject' => 'Facture de votre séjour', 'text' => "Bonjour, pourriez-vous m'envoyer une facture au nom de ma société ? Merci, Paul"],
             ]),
+            $conv('0192f7c4-0000-7000-8000-00000000c004', 'Réservation 1 : départ', 'alex.demo@guest.airbnb.com', 'Alex Martin', [
+                ['type' => 'inbound', 'id' => 'm5', 'at' => $at('-1 day'), 'from' => 'alex.demo@guest.airbnb.com', 'subject' => 'Réservation 1 : départ', 'text' => "Bonjour,\nPouvons-nous laisser les bagages jusqu'à 13 h le jour du départ ?\nAlex"],
+                ['type' => 'reply', 'id' => 'm6', 'at' => $at('-1 day +2 hours'), 'from' => 'contact@example.org', 'subject' => 'Re: Réservation 1 : départ', 'text' => "Bonjour Alex,\nOui, laissez-les dans l'entrée, le ménage passe à 13 h.", 'status' => 'sent'],
+            ]),
+            $conv('0192f7c4-0000-7000-8000-00000000c005', 'Réservation 3 : parking', 'sofia.demo@guest.airbnb.com', 'Sofia Rossi', [
+                ['type' => 'inbound', 'id' => 'm7', 'at' => $at('-3 days'), 'from' => 'sofia.demo@guest.airbnb.com', 'subject' => 'Réservation 3 : parking', 'text' => 'Bonjour, y a-t-il une place de parking près du logement ? Sofia'],
+            ]),
+            $conv('0192f7c4-0000-7000-8000-00000000c006', 'Réservation 5 : lit bébé', 'anna.demo@guest.booking.com', 'Anna Kowalska', [
+                ['type' => 'inbound', 'id' => 'm8', 'at' => $at('-6 hours'), 'from' => 'anna.demo@guest.booking.com', 'subject' => 'Réservation 5 : lit bébé', 'text' => 'Bonjour, serait-il possible d’avoir un lit bébé ? Merci, Anna'],
+            ]),
             $conv('0192f7c4-0000-7000-8000-00000000c003', 'Proposition de partenariat', 'agence.demo@example.net', 'Agence Démo', [
                 ['type' => 'inbound', 'id' => 'm4', 'at' => $at('-5 days'), 'from' => 'agence.demo@example.net', 'subject' => 'Proposition de partenariat', 'text' => 'Bonjour, nous gérons des locations dans votre quartier…'],
             ]),

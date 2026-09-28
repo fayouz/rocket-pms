@@ -95,6 +95,19 @@ final class AccessCodePlanner
         }
     }
 
+    /**
+     * Live grants of the property's place, indexed by externalRef (booking id), without planning anything (read-only,
+     * used by the timeline). Empty when the property has no place.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function liveGrants(Property $property): array
+    {
+        $placeId = $property->getPlaceId();
+
+        return null === $placeId ? [] : $this->grants($placeId);
+    }
+
     /** Cleanings of the place after this sync, indexed by externalRef ("booking:<id>:checkout"); empty when unavailable. @var array<string, array<string, mixed>> */
     private array $lastCleanings = [];
 
