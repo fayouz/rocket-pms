@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de Rocket PMS. Format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.3.0] - 2026-09-28
 
 ### Ajouté
 - **Rocket Clean** : les ménages après départ sont créés dans Rocket Clean (`Clean/CleanClient`, `ROCKET_CLEAN_URL`/`ROCKET_CLEAN_TOKEN`, audience suite `rocket-clean`, démo sans réseau) avec `type: rental` et `origin: pms` ; la planification y pousse aussi l'occupation du lieu (séjours, `externalRef` `booking:<id>`). Timeline, `/api/properties/{id}/cleanings` et `/link`, compteur « ménages ouverts » des Liaisons lisent Rocket Clean.
