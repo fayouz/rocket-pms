@@ -120,7 +120,14 @@ export interface Lock {
   provider: string
 }
 
-export interface TimelineEvent { at: string, kind: string, icon: string, title: string, description: string }
+/** cleaningId: Rocket Place cleaning task of a "cleaning" event (its secret link: GET /api/properties/{id}/cleanings/{cleaningId}/link). */
+export interface TimelineEvent { at: string, kind: string, icon: string, title: string, description: string, cleaningId?: string }
+
+/** Secret link without account of a cleaning, for the cleaner (Rocket Place /m/<token>). */
+export interface CleaningLink { url: string, path: string, expiresAt: string }
+
+/** Result of POST /api/planning/run, per property linked to a place. */
+export interface PlanningRun { ranAt: string, properties: { id: string, name: string, ok: boolean, grants: number, cleanings: number, error: string | null }[] }
 
 export interface Place { id: string, name: string, address: string | null, color: string }
 
