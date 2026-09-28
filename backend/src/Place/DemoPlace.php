@@ -6,7 +6,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Rocket Place used whenever ROCKET_PLACE_URL / ROCKET_PLACE_TOKEN are not configured: a tiny in-process imitation of
+ * Rocket Place used whenever ROCKET_PLACE_URL / secret rocket.place.token are not configured: a tiny in-process imitation of
  * the endpoints PMS uses (same paths, same JSON shapes), so the app and its functional tests stay fully offline.
  * State is kept in a small JSON file (var/demo-place-<env>.json) since, like a real HTTP call, it must survive across
  * requests (cleanings included, find-or-create by externalRef as the real API). Also backs App\Clean\DemoClean (cleanings,

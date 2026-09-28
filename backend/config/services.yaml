@@ -1,17 +1,12 @@
 parameters:
     env(UPDATE_REPOSITORY): 'fayouz/rocket-pms'
-    env(LODGIFY_API_KEY): ''
     env(PMS_TIMEZONE): 'Europe/Paris'
     env(ROCKET_PLACE_URL): ''
-    env(ROCKET_PLACE_TOKEN): ''
     env(ROCKET_PLACE_FRONT_URL): ''
     env(ROCKET_CLEAN_URL): ''
-    env(ROCKET_CLEAN_TOKEN): ''
     env(ROCKET_STOCK_URL): ''
-    env(ROCKET_STOCK_TOKEN): ''
     env(ROCKET_CAST_FRONT_URL): ''
     env(ROCKET_MAILER_URL): ''
-    env(ROCKET_MAILER_TOKEN): ''
     env(ROCKET_MAILER_INBOX): ''
     env(ROCKET_MAILER_MAILBOX): ''
 
@@ -20,16 +15,17 @@ services:
         autowire: true
         autoconfigure: true
         bind:
-            $lodgifyApiKey: '%env(LODGIFY_API_KEY)%'
+            # Keys and tokens read at call time from the secrets vault (App\Secrets\IntegrationSecrets).
+            $lodgifyApiKey: '@App\Secrets\IntegrationSecrets'
             $timezone: '%env(PMS_TIMEZONE)%'
             $placeUrl: '%env(ROCKET_PLACE_URL)%'
-            $placeToken: '%env(ROCKET_PLACE_TOKEN)%'
+            $placeToken: '@App\Secrets\IntegrationSecrets'
             $cleanUrl: '%env(ROCKET_CLEAN_URL)%'
-            $cleanToken: '%env(ROCKET_CLEAN_TOKEN)%'
+            $cleanToken: '@App\Secrets\IntegrationSecrets'
             $stockUrl: '%env(ROCKET_STOCK_URL)%'
-            $stockToken: '%env(ROCKET_STOCK_TOKEN)%'
+            $stockToken: '@App\Secrets\IntegrationSecrets'
             $mailerUrl: '%env(ROCKET_MAILER_URL)%'
-            $mailerToken: '%env(ROCKET_MAILER_TOKEN)%'
+            $mailerToken: '@App\Secrets\IntegrationSecrets'
             $mailerInbox: '%env(ROCKET_MAILER_INBOX)%'
             $mailerMailbox: '%env(ROCKET_MAILER_MAILBOX)%'
             $demoMailerPath: '%kernel.project_dir%/var/demo-mailer-%kernel.environment%.json'

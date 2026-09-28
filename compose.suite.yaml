@@ -309,9 +309,10 @@ services:
       ROCKET_INTERNAL_URL: http://pms-api
       ROCKET_AUTH_CLIENT_ID: rocket-pms
       ROCKET_AUTH_CLIENT_SECRET: demo-rocket-pms-client-secret
-      # Rocket Place with a token of Rocket Auth (no ROCKET_PLACE_TOKEN needed). Lodgify stays in demo.
+      # Rocket Place with a token of Rocket Auth (no static token needed). Lodgify stays in demo (no secret lodgify.api_key).
       ROCKET_PLACE_URL: http://place-api
-      LODGIFY_API_KEY: ""
+      # Secrets vault (demo key, never in production).
+      ROCKET_SECRETS_KEY: ZGVtby1idXNpbmVzcy1zdWl0ZS1yb2NrZXQtcG1zLTA=
       PMS_TIMEZONE: Europe/Paris
     volumes:
       - pms_jwt:/app/config/jwt

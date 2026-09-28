@@ -8,7 +8,7 @@ use App\Repository\ConnectorRepository;
 
 /**
  * Resolves the booking provider of a property: the first enabled connector declaring the 'bookings' capability
- * (App\Domotique\LodgifyPlugin), or the single legacy LODGIFY_API_KEY (App\Lodgify\LodgifyClient) when the property
+ * (App\Domotique\LodgifyPlugin), or the single legacy secret lodgify.api_key (App\Lodgify\LodgifyClient) when the property
  * has none, so existing properties keep working unchanged.
  */
 final class BookingProviderRegistry

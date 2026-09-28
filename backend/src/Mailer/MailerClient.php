@@ -2,6 +2,7 @@
 
 namespace App\Mailer;
 
+use App\Secrets\IntegrationSecrets;
 use Rocket\Core\Oidc\OidcException;
 use Rocket\Core\Suite\ServiceTokenProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -10,8 +11,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Client of Rocket Mailer (rocket-middleware/rocket-mailer), the mail system of the Rocket suite: PMS never speaks
  * IMAP/SMTP itself. Every call acts on behalf of the signed-in user (X-Impersonate-User), with the application token
- * ROCKET_MAILER_TOKEN (rma_…) or, in suite mode, a token of Rocket Auth for the audience "rocket-mailer".
- * Without ROCKET_MAILER_URL/TOKEN: App\Mailer\DemoMailer answers (no network, keeps tests offline).
+ * secret rocket.mailer.token (rma_…) or, in suite mode, a token of Rocket Auth for the audience "rocket-mailer".
+ * Without ROCKET_MAILER_URL + secret rocket.mailer.token: App\Mailer\DemoMailer answers (no network, keeps tests offline).
  *
  * Used endpoints: POST /api/emails (send), GET /api/inbox/mailboxes/{id}/conversations?q= and
  * GET /api/inbox/conversations/{id} (shared inbox ROCKET_MAILER_INBOX). Rocket Mailer 0.7 refuses its shared inboxes
@@ -27,16 +28,22 @@ final class MailerClient
         private readonly HttpClientInterface $http,
         private readonly DemoMailer $demo,
         private readonly string $mailerUrl,
-        private readonly string $mailerToken,
+        private readonly IntegrationSecrets|string $mailerToken,
         private readonly string $mailerInbox,
         private readonly string $mailerMailbox,
         private readonly ?ServiceTokenProvider $serviceTokens = null,
     ) {
     }
 
+    /** The token: fixed (per-connector client), or read at call time from the vault ("rocket.mailer.token", see App\Secrets\IntegrationSecrets). */
+    private function mailerToken(): string
+    {
+        return $this->mailerToken instanceof IntegrationSecrets ? $this->mailerToken->get('rocket.mailer.token') : $this->mailerToken;
+    }
+
     public function isDemo(): bool
     {
-        return '' === trim($this->mailerUrl) || ('' === trim($this->mailerToken) && !$this->usesSuiteTokens());
+        return '' === trim($this->mailerUrl) || ('' === trim($this->mailerToken()) && !$this->usesSuiteTokens());
     }
 
     public function usesSuiteTokens(): bool
@@ -130,13 +137,13 @@ final class MailerClient
             try {
                 return $this->serviceTokens->tokenForClient(self::AUDIENCE);
             } catch (OidcException $e) {
-                if ('' === trim($this->mailerToken)) {
+                if ('' === trim($this->mailerToken())) {
                     throw new HttpException(502, 'Rocket Auth ne délivre pas de jeton pour Rocket Mailer : '.$e->getMessage());
                 }
             }
         }
 
-        return $this->mailerToken;
+        return $this->mailerToken();
     }
 
     /** @param array<string, mixed> $options */
@@ -168,7 +175,7 @@ final class MailerClient
             if ($this->usesSuiteTokens()) {
                 $this->serviceTokens->forget(self::AUDIENCE);
             }
-            throw new HttpException(502, 'Jeton Rocket Mailer refusé (ROCKET_MAILER_TOKEN ou client Rocket Auth).');
+            throw new HttpException(502, 'Jeton Rocket Mailer refusé (secret rocket.mailer.token ou client Rocket Auth).');
         }
         if (403 === $status) {
             throw new HttpException(502, 'Rocket Mailer refuse cette action à l’application Rocket PMS (impersonation autorisée ? utilisateur connu de Rocket Mailer ?).');

@@ -10,7 +10,7 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Creates a property for every Lodgify property not linked yet (named after its short "internal name") and refreshes
  * the Lodgify name and coordinates. Locks are no longer synced here: they belong to Rocket Place (link a property to
- * its place, see App\Controller\PlaceLinkController). Always uses the legacy, global LODGIFY_API_KEY account
+ * its place, see App\Controller\PlaceLinkController). Always uses the legacy, global secret lodgify.api_key account
  * (App\Lodgify\BookingProviderRegistry::legacy), since it runs before any property (and so any connector) exists.
  */
 final class PropertySync

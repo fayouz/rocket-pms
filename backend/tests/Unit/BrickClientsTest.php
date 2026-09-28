@@ -74,7 +74,7 @@ final class BrickClientsTest extends TestCase
             self::fail('401 expected to become a 502');
         } catch (HttpException $e) {
             self::assertSame(502, $e->getStatusCode());
-            self::assertStringContainsString('ROCKET_STOCK_TOKEN', $e->getMessage());
+            self::assertStringContainsString('rocket.stock.token', $e->getMessage());
         }
     }
 

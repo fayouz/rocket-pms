@@ -11,7 +11,7 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-/** PMS → Rocket Place: token of Rocket Auth in suite mode, static ROCKET_PLACE_TOKEN otherwise. No network. */
+/** PMS → Rocket Place: token of Rocket Auth in suite mode, static token (secret rocket.place.token) otherwise. No network. */
 final class PlaceClientSuiteTokenTest extends TestCase
 {
     /** @var list<string> */
