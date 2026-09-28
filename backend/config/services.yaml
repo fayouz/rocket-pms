@@ -4,6 +4,10 @@ parameters:
     env(PMS_TIMEZONE): 'Europe/Paris'
     env(ROCKET_PLACE_URL): ''
     env(ROCKET_PLACE_TOKEN): ''
+    env(ROCKET_MAILER_URL): ''
+    env(ROCKET_MAILER_TOKEN): ''
+    env(ROCKET_MAILER_INBOX): ''
+    env(ROCKET_MAILER_MAILBOX): ''
 
 services:
     _defaults:
@@ -14,6 +18,11 @@ services:
             $timezone: '%env(PMS_TIMEZONE)%'
             $placeUrl: '%env(ROCKET_PLACE_URL)%'
             $placeToken: '%env(ROCKET_PLACE_TOKEN)%'
+            $mailerUrl: '%env(ROCKET_MAILER_URL)%'
+            $mailerToken: '%env(ROCKET_MAILER_TOKEN)%'
+            $mailerInbox: '%env(ROCKET_MAILER_INBOX)%'
+            $mailerMailbox: '%env(ROCKET_MAILER_MAILBOX)%'
+            $demoMailerPath: '%kernel.project_dir%/var/demo-mailer-%kernel.environment%.json'
             $demoPlacePath: '%kernel.project_dir%/var/demo-place-%kernel.environment%.json'
 
     App\:
