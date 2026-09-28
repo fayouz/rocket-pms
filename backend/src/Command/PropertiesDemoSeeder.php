@@ -18,7 +18,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * Demo: the two fictitious Lodgify properties, their colours and the link to their place. With the demo Rocket Place
  * (no ROCKET_PLACE_URL/TOKEN) the fixed DemoPlace ids; with a real (local) Rocket Place, the place of the same name
- * (seeded by Place's own app:demo:seed), created from the property when missing. Never overwrites an existing link.
+ * (seeded by Place's own app:demo:seed with the same fixed ids), created from the property when missing. Never overwrites a
+ * link to a place that still exists.
  */
 final class PropertiesDemoSeeder implements DemoSeederInterface
 {
@@ -35,6 +36,7 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
     public function seed(array $users, SymfonyStyle $io): void
     {
         $this->sync->sync();
+        $known = $this->place->isDemo() ? [] : $this->knownPlaceIds();
         $demo = [1001 => ['green', DemoPlace::PORT, 'Le port'], 1002 => ['blue', DemoPlace::VIGNES, 'Les vignes']];
         foreach ($demo as $lodgifyId => [$color, $demoPlaceId, $placeName]) {
             $property = $this->properties->findOneBy(['lodgifyPropertyId' => $lodgifyId]);
@@ -57,7 +59,7 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
             $this->seedExpenses($property);
             if ($this->place->isDemo()) {
                 $property->setPlaceId($demoPlaceId);
-            } elseif (null === $property->getPlaceId() || \in_array($property->getPlaceId(), [DemoPlace::PORT, DemoPlace::VIGNES], true)) {
+            } elseif (null === $property->getPlaceId() || \in_array($property->getPlaceId(), [DemoPlace::PORT, DemoPlace::VIGNES], true) || !\in_array($property->getPlaceId(), $known, true)) {
                 try {
                     $property->setPlaceId($this->realPlaceId($placeName, $color));
                 } catch (HttpException $e) {
@@ -85,6 +87,16 @@ final class PropertiesDemoSeeder implements DemoSeederInterface
             ["$y-07-01", 60, 'autre_recette', 'Remboursement caution cassée'],
         ] as [$date, $amount, $category, $note]) {
             $this->em->persist((new Expense($property))->apply(['date' => $date, 'amount' => $amount, 'category' => $category, 'note' => $note]));
+        }
+    }
+
+    /** Ids of the places of the real Rocket Place (a link to a vanished place, e.g. re-keyed demo place, is repaired). */
+    private function knownPlaceIds(): array
+    {
+        try {
+            return array_values(array_filter(array_map(fn ($p) => \is_array($p) ? ($p['id'] ?? null) : null, $this->place->request('GET', '/api/places')), 'is_string'));
+        } catch (HttpException) {
+            return [];
         }
     }
 
