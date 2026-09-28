@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Code\AccessCodePlanner;
 use App\Entity\Property;
 use App\Place\PlaceClient;
+use App\Stock\StockClient;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -18,7 +19,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * The physical side of a property, forwarded to its place in Rocket Place so the browser only ever talks to PMS:
- * locks, access grants (keypad codes of the stays), domotique, documents, stock. A property without a place answers
+ * locks, access grants (keypad codes of the stays), domotique, documents; the stock goes to Rocket Stock (App\Stock\StockClient). A property without a place answers
  * 409 with a clear message. Reads: any user; writes: admin (sending a code: any user, always on an explicit click).
  */
 #[IsGranted('PMS_READ')]
@@ -26,7 +27,7 @@ final class PlaceProxyController extends AbstractController
 {
     private const ID = ['id' => Requirement::UUID];
 
-    public function __construct(private readonly PlaceClient $place, private readonly AccessCodePlanner $planner)
+    public function __construct(private readonly PlaceClient $place, private readonly AccessCodePlanner $planner, private readonly StockClient $stock)
     {
     }
 
@@ -147,28 +148,25 @@ final class PlaceProxyController extends AbstractController
         ]);
     }
 
-    /** Stock of the place: the catalogue items and this place's levels (ok, low, empty). */
+    /** Stock of the place, read from Rocket Stock: the catalogue items and this place's levels (ok, low, empty). */
     #[Route('/api/properties/{id}/stock', name: 'api_property_stock', methods: ['GET'], requirements: self::ID)]
     public function stock(#[MapEntity] Property $property): JsonResponse
     {
-        $placeIri = '/api/places/'.PlaceClient::placeIdOf($property);
-        $items = $this->place->request('GET', '/api/stock-items');
-        $levels = $this->place->request('GET', '/api/stock-levels', null, ['place' => $placeIri]);
+        $placeId = PlaceClient::placeIdOf($property);
 
-        return $this->json(['items' => array_values($items), 'levels' => array_values($levels)]);
+        return $this->json(['items' => $this->stock->items(), 'levels' => $this->stock->levels($placeId)]);
     }
 
     /** JSON {"level": "ok"|"low"|"empty"}: only a level of this property's place. */
     #[Route('/api/properties/{id}/stock/{levelId}', name: 'api_property_stock_update', methods: ['PATCH'], requirements: ['id' => Requirement::UUID, 'levelId' => Requirement::UUID])]
     public function updateStock(#[MapEntity] Property $property, string $levelId, Request $request): JsonResponse
     {
-        $placeIri = '/api/places/'.PlaceClient::placeIdOf($property);
-        $mine = array_column($this->place->request('GET', '/api/stock-levels', null, ['place' => $placeIri]), 'id');
+        $mine = array_column($this->stock->levels(PlaceClient::placeIdOf($property)), 'id');
         if (!\in_array($levelId, $mine, true)) {
             throw new HttpException(404, 'Niveau de stock introuvable pour ce logement.');
         }
 
-        return $this->json($this->place->request('PATCH', '/api/stock-levels/'.$levelId, ['level' => (string) ($request->toArray()['level'] ?? '')]));
+        return $this->json($this->stock->setLevel($levelId, (string) ($request->toArray()['level'] ?? '')));
     }
 
     private function base(Property $property): string

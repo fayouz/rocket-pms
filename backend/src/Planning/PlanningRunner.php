@@ -8,7 +8,7 @@ use App\Repository\PropertyRepository;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Plans the access grants and the cleanings (Rocket Place) of every property linked to a place
+ * Plans the access grants and the cleanings (Rocket Clean) of every property linked to a place
  * (AccessCodePlanner::plan, which also syncs the cleanings). Run every 15 minutes by the worker (PlanningSchedule) and
  * on demand (POST /api/planning/run); reads (timeline) never plan. A failure on one property never stops the others.
  */

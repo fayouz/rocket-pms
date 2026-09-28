@@ -20,7 +20,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * is revoked and re-planned; a grant already sent to the lock is never touched (flagged "outdated").
  * Sending the code to the lock stays an explicit user click (::send), never implicit. A stay that has started is
  * never touched again. Planning also syncs the cleanings after each departure (App\Cleaning\CleaningPlanner); a
- * failure there (Rocket Place without cleanings, 4xx) never blocks the codes.
+ * failure there (Rocket Clean unreachable, 4xx) never blocks the codes.
  */
 final class AccessCodePlanner
 {
@@ -126,7 +126,7 @@ final class AccessCodePlanner
         try {
             $this->lastCleanings = $this->cleanings->sync($placeId, $this->bookingsOf($property), $this);
         } catch (HttpException) {
-            // Rocket Place without cleanings or refusing them: the access codes are still planned
+            // Rocket Clean unreachable or refusing them: the access codes are still planned
         }
     }
 

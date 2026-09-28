@@ -10,7 +10,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Cleanings after departure, planned in Rocket Place (demo) together with the access codes: one task per upcoming
+ * Cleanings after departure, planned in Rocket Clean (demo) together with the access codes: one task per upcoming
  * departure (externalRef "booking:<id>:checkout"), due at the next check-in, idempotent, moved when its dates drift,
  * cancelled with its booking, shown in the timeline (which only reads). Planned by POST /api/planning/run or the
  * recurring task (RunPlanning, every 15 min). No network call.
@@ -61,6 +61,10 @@ final class CleaningTest extends WebTestCase
         self::assertEquals($day(8, '15:00'), new \DateTimeImmutable($c3['dueAt']), 'due at the next check-in');
         self::assertEquals($day(13, '11:00'), new \DateTimeImmutable($cleanings['booking:5:checkout']['dueAt']), 'no next stay: departure + 1 day');
         self::assertSame('todo', $c3['status']);
+        self::assertSame('rental', $c3['type']);
+        self::assertSame('pms', $c3['origin']);
+        $occupancy = static::getContainer()->get(DemoPlace::class)->handle('GET', '/api/places/'.DemoPlace::PORT.'/occupancy', null, []);
+        self::assertContains('booking:3', array_column($occupancy, 'externalRef'), 'stays pushed to Rocket Clean as occupancy');
         self::assertStringContainsString('Sofia Rossi', $c3['label']);
         self::assertContains('cleaning', array_column($timeline['events'], 'kind'));
 

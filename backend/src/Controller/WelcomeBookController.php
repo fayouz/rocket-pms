@@ -49,6 +49,7 @@ final class WelcomeBookController extends AbstractController
         private readonly WelcomeBookVisitRepository $visits,
         private readonly PlaceClient $place,
         #[Autowire('%env(FRONTEND_URL)%')] private readonly string $frontendUrl,
+        #[Autowire('%env(ROCKET_CAST_FRONT_URL)%')] private readonly string $castFrontUrl = '',
     ) {
     }
 
@@ -290,6 +291,9 @@ final class WelcomeBookController extends AbstractController
             'content' => $book->getContent(), 'translations' => $book->getTranslations(), 'languages' => WelcomeBook::LANGUAGES, 'style' => $book->getStyle(),
             'tvToken' => $book->getTvToken(), 'tvPath' => '/tv/'.$book->getTvToken(), 'tvUrl' => $this->absolute('/tv/'.$book->getTvToken()),
             'updatedAt' => $book->getUpdatedAt()?->format(\DATE_ATOM),
+            // Rocket Cast (source rocket_pms): front to open, the property to pick there
+            'castFrontUrl' => '' === trim($this->castFrontUrl) ? null : rtrim($this->castFrontUrl, '/'),
+            'propertyId' => $book->getProperty()->getId()->toRfc4122(),
         ];
     }
 
