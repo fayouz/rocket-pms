@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { Bilan, Expense } from '~/types/pms'
+import type { Bilan, Expense, StatementImport } from '~/types/pms'
 
 // Bilan of a property for a year: Lodgify revenue (spread night by night), charges and other income entered here
-// (admins), totals per month and per category, CSV export. Ported from LoussaHousing's bilan.
-const props = defineProps<{ propertyId: string }>()
+// (admins), totals per month and per category, CSV export, import of platform statements (commissions, tourist tax).
+// The receipt of an entry is picked in the documents of the place (DocumentPicker). Ported from LoussaHousing's bilan.
+const props = defineProps<{ propertyId: string, placeId: string | null }>()
 const api = useApi()
 const auth = useAuth()
 const config = useRuntimeConfig()
@@ -52,6 +53,35 @@ async function remove(e: Expense) {
   }
 }
 
+const pickerOpen = ref(false)
+
+// Import of a platform statement (CSV): dedup by source + externalId on the server, payouts skipped
+const importOpen = ref(false)
+const importSource = ref('airbnb')
+const importFile = ref<File | null>(null)
+const importing = ref(false)
+const importResult = ref<StatementImport | null>(null)
+function onImportFile(e: Event) {
+  importFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+async function runImport() {
+  if (!importFile.value) return
+  importing.value = true
+  try {
+    const body = new FormData()
+    body.append('file', importFile.value)
+    body.append('source', importSource.value.trim().toLowerCase())
+    importResult.value = await api<StatementImport>(`${base.value}/expenses/import`, { method: 'POST', body })
+    await refresh()
+  }
+  catch (e) {
+    toast.add({ title: 'Import impossible', description: apiErrorMessage(e), color: 'error' })
+  }
+  finally {
+    importing.value = false
+  }
+}
+
 // CSV: fetched with the session token, then saved by the browser
 const exporting = ref(false)
 async function exportCsv() {
@@ -85,6 +115,7 @@ async function exportCsv() {
       </div>
       <div class="flex gap-2">
         <UButton v-if="isAdmin" icon="i-lucide-plus" label="Ajouter une écriture" @click="edit()" />
+        <UButton v-if="isAdmin" icon="i-lucide-file-up" color="neutral" variant="outline" label="Importer un relevé" @click="importResult = null; importOpen = true" />
         <UButton icon="i-lucide-download" color="neutral" variant="outline" label="Export CSV" :loading="exporting" @click="exportCsv" />
       </div>
     </div>
@@ -174,8 +205,12 @@ async function exportCsv() {
           <UFormField label="Montant (€)"><UInput v-model="form.amount" inputmode="decimal" placeholder="0,00" class="w-full" /></UFormField>
           <UFormField label="Catégorie"><USelect v-model="form.category" :items="categoryItems" class="w-full" /></UFormField>
           <UFormField label="Note"><UInput v-model="form.note" :maxlength="500" class="w-full" /></UFormField>
-          <UFormField label="Document Rocket Place (optionnel)" help="Identifiant du justificatif dans l’onglet Documents, ex. file:…">
-            <UInput v-model="form.documentRef" :maxlength="255" class="w-full" />
+          <UFormField label="Justificatif (optionnel)" :help="placeId ? 'Document du lieu dans Rocket Place.' : 'Lie le logement à un lieu Rocket Place pour choisir un document.'">
+            <div class="flex gap-2">
+              <UInput v-model="form.documentRef" :maxlength="255" placeholder="file:…" class="w-full" />
+              <UButton v-if="placeId" icon="i-lucide-folder-search" color="neutral" variant="outline" label="Parcourir" @click="pickerOpen = true" />
+              <UButton v-if="form.documentRef" icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Retirer le justificatif" @click="form.documentRef = ''" />
+            </div>
           </UFormField>
         </div>
       </template>
@@ -183,6 +218,31 @@ async function exportCsv() {
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="Annuler" @click="formOpen = false" />
           <UButton icon="i-lucide-save" label="Enregistrer" :loading="saving" :disabled="!form.date || !form.amount" @click="save" />
+        </div>
+      </template>
+    </UModal>
+
+    <DocumentPicker v-if="placeId && isAdmin" v-model:open="pickerOpen" :property-id="propertyId" title="Choisir le justificatif" @pick="(id) => (form.documentRef = id)" />
+
+    <UModal v-model:open="importOpen" title="Importer un relevé de plateforme" description="Commissions, taxes de séjour, remboursements : une écriture par ligne, sans doublon.">
+      <template #body>
+        <div class="space-y-3 text-sm">
+          <p class="text-muted">CSV séparé par <code>;</code> ou <code>,</code>, avec l’en-tête <code>externalId;date;kind;amount;label;bookingRef</code>. <code>kind</code> : fee (commission), tourist_tax (taxe de séjour), refund, other, income ; les reversements (payout) sont ignorés, déjà comptés par Lodgify. Réimporter le même relevé n’ajoute rien.</p>
+          <UFormField label="Plateforme (source)"><UInput v-model="importSource" placeholder="airbnb, booking…" :maxlength="30" class="w-full" /></UFormField>
+          <UFormField label="Fichier CSV"><input type="file" accept=".csv,text/csv" class="text-sm" @change="onImportFile"></UFormField>
+          <UAlert
+v-if="importResult" :color="importResult.invalid.length ? 'warning' : 'success'" variant="subtle"
+            :title="`${importResult.inserted} ajoutée(s), ${importResult.duplicates} déjà connue(s), ${importResult.skipped} ignorée(s), ${importResult.invalid.length} invalide(s)`">
+            <template v-if="importResult.invalid.length" #description>
+              <ul class="list-disc pl-4"><li v-for="i in importResult.invalid.slice(0, 20)" :key="i.line">Ligne {{ i.line }} : {{ i.reason }}</li></ul>
+            </template>
+          </UAlert>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="Fermer" @click="importOpen = false" />
+          <UButton icon="i-lucide-file-up" label="Importer" :loading="importing" :disabled="!importFile || !importSource" @click="runImport" />
         </div>
       </template>
     </UModal>
