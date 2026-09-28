@@ -1,10 +1,9 @@
 parameters:
     env(UPDATE_REPOSITORY): 'fayouz/rocket-pms'
     env(LODGIFY_API_KEY): ''
-    env(NUKI_API_TOKEN): ''
     env(PMS_TIMEZONE): 'Europe/Paris'
-    env(ROCKET_CLOUD_URL): ''
-    env(ROCKET_CLOUD_TOKEN): ''
+    env(ROCKET_PLACE_URL): ''
+    env(ROCKET_PLACE_TOKEN): ''
 
 services:
     _defaults:
@@ -12,11 +11,10 @@ services:
         autoconfigure: true
         bind:
             $lodgifyApiKey: '%env(LODGIFY_API_KEY)%'
-            $nukiApiToken: '%env(NUKI_API_TOKEN)%'
             $timezone: '%env(PMS_TIMEZONE)%'
-            $cloudUrl: '%env(ROCKET_CLOUD_URL)%'
-            $cloudToken: '%env(ROCKET_CLOUD_TOKEN)%'
-            $storagePath: '%kernel.project_dir%/var/demo-cloud.json'
+            $placeUrl: '%env(ROCKET_PLACE_URL)%'
+            $placeToken: '%env(ROCKET_PLACE_TOKEN)%'
+            $demoPlacePath: '%kernel.project_dir%/var/demo-place-%kernel.environment%.json'
 
     App\:
         resource: '../src/'

@@ -18,7 +18,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * A rental property (logement), usually linked to a Lodgify property: bookings, messaging and prices come from Lodgify,
- * smart locks from Nuki. Created automatically for every Lodgify property (POST /api/properties/sync), renamable here.
+ * everything physical (locks, access grants, domotique, documents, stock) from its place in Rocket Place. Created automatically for every Lodgify property (POST /api/properties/sync), renamable here.
  */
 #[ORM\Entity(repositoryClass: PropertyRepository::class)]
 #[UniqueEntity(fields: ['lodgifyPropertyId'], message: 'property.lodgify_taken')]
@@ -73,10 +73,13 @@ class Property
     #[Groups(['property:read'])]
     private ?float $longitude = null;
 
-    /** Folder of the property in Rocket Cloud (documents, v0.2). */
-    #[ORM\Column(length: 64, nullable: true)]
-    #[Groups(['property:read', 'property:write'])]
-    private ?string $cloudFolderId = null;
+    /**
+     * Id of the place of this property in Rocket Place (locks, access grants, domotique, documents, stock). Set by an
+     * admin through PUT /api/properties/{id}/place (checked against Rocket Place), never through PATCH.
+     */
+    #[ORM\Column(length: 36, nullable: true)]
+    #[Groups(['property:read'])]
+    private ?string $placeId = null;
 
     use TrackedTrait;
 
@@ -97,6 +100,6 @@ class Property
     public function getLatitude(): ?float { return $this->latitude; }
     public function getLongitude(): ?float { return $this->longitude; }
     public function setCoordinates(?float $latitude, ?float $longitude): static { $this->latitude = $latitude; $this->longitude = $longitude; return $this; }
-    public function getCloudFolderId(): ?string { return $this->cloudFolderId; }
-    public function setCloudFolderId(?string $id): static { $this->cloudFolderId = $id; return $this; }
+    public function getPlaceId(): ?string { return $this->placeId; }
+    public function setPlaceId(?string $id): static { $this->placeId = $id; return $this; }
 }

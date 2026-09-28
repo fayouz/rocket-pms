@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Code\AccessCodePlanner;
 use App\Entity\Property;
 use App\Repository\PropertyRepository;
 use App\Timeline\TimelineBuilder;
@@ -18,7 +17,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 final class TimelineController extends AbstractController
 {
-    public function __construct(private readonly TimelineBuilder $builder, private readonly AccessCodePlanner $planner)
+    public function __construct(private readonly TimelineBuilder $builder)
     {
     }
 
@@ -26,7 +25,6 @@ final class TimelineController extends AbstractController
     public function one(#[MapEntity] Property $property, Request $request): JsonResponse
     {
         [$past, $future] = self::window($request);
-        $this->planner->plan(); // codes of upcoming stays appear on the timeline even before anyone opened the bookings
 
         return $this->json(['now' => (new \DateTimeImmutable())->format(\DATE_ATOM), 'events' => $this->builder->build($property, $past, $future)]);
     }
@@ -35,7 +33,6 @@ final class TimelineController extends AbstractController
     public function all(Request $request, PropertyRepository $properties): JsonResponse
     {
         [$past, $future] = self::window($request);
-        $this->planner->plan(); // codes of upcoming stays appear on the timeline even before anyone opened the bookings
 
         return $this->json([
             'now' => (new \DateTimeImmutable())->format(\DATE_ATOM),
